@@ -2,20 +2,27 @@
 
 [English](README.md) | [日本語](README.ja.md)
 
-App Store Connect API からデータを取得するコマンドラインツールです。アプリ一覧、売上レポート、カスタマーレビュー、アナリティクスに対応しています。
+個人開発者が App Store Connect のデータ（売上レポート・レビュー・アナリティクス）を取得し、Claude Code などの AI ツールにパイプしてアプリのグロースに活用するための CLI ツールです。
 
 ## インストール
+
+### Homebrew（推奨）
+
+```bash
+brew tap tadaken3/appc
+brew install appc
+```
 
 ### go install
 
 ```bash
-go install github.com/kenta-tanaka/appc@latest
+go install github.com/tadaken3/appc@latest
 ```
 
 ### ソースからビルド
 
 ```bash
-git clone https://github.com/kenta-tanaka/appc.git
+git clone https://github.com/tadaken3/appc.git
 cd appc
 go build -o appc .
 ```
