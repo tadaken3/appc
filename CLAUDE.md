@@ -25,12 +25,12 @@ go vet ./...
 
 ## 開発ワークフロー
 
-1. `main` からブランチを切る
+1. `develop` からブランチを切る（`feat/`, `fix/`, `docs/` など）
 2. コードを修正する
 3. `go test ./...` でテストが通ることを確認
 4. `golangci-lint run` で lint エラーがないことを確認
 5. コミット・push する
-6. PR を作成し、CI（GitHub Actions）が通ることを確認
+6. `develop` への PR を作成し、CI（GitHub Actions）が通ることを確認
 
 ## CI（GitHub Actions）
 
@@ -40,7 +40,7 @@ go vet ./...
 - **lint**: golangci-lint v2（errcheck 等の静的解析）
 - **vet**: go vet
 
-トリガー: `main` への push / PR
+トリガー: `main` / `develop` への push / PR
 
 ## プロジェクト構成
 
