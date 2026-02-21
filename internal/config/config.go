@@ -2,7 +2,9 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -54,13 +56,22 @@ func Validate(cfg *Config) error {
 	if cfg.PrivateKeyPath == "" {
 		return fmt.Errorf("private_key_path is not set: run 'appc configure'")
 	}
-	if _, err := os.Stat(cfg.PrivateKeyPath); os.IsNotExist(err) {
-		return fmt.Errorf("private key file not found: %s", cfg.PrivateKeyPath)
+	if _, err := os.Stat(cfg.PrivateKeyPath); errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("private key file not found")
 	}
 	if cfg.VendorNumber == "" {
 		return fmt.Errorf("vendor_number is not set: run 'appc configure'")
 	}
 	return nil
+}
+
+// ValidateFromPath loads the config from path and validates it.
+func ValidateFromPath(path string) error {
+	cfg, err := Load(path)
+	if err != nil {
+		return fmt.Errorf("loading config: %w (run 'appc configure' to set up credentials)", err)
+	}
+	return Validate(cfg)
 }
 
 func Save(cfg *Config, path string) error {

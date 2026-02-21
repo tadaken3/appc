@@ -1,13 +1,12 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/kenta-tanaka/appc/internal/api"
 	"github.com/kenta-tanaka/appc/internal/output"
+	"github.com/kenta-tanaka/appc/internal/sales"
 	"github.com/spf13/cobra"
 )
 
@@ -55,10 +54,11 @@ func runSales(cmd *cobra.Command, args []string) error {
 		if salesFrom == "" || salesTo == "" {
 			return fmt.Errorf("--from and --to must be used together")
 		}
-		dates, err := dateRange(salesFrom, salesTo)
+		dates, err := sales.DateRange(salesFrom, salesTo)
 		if err != nil {
 			return err
 		}
+		ctx := cmd.Context()
 		var all []api.SalesRecord
 		for _, date := range dates {
 			_, _ = fmt.Fprintf(os.Stderr, "fetching %s...\n", date)
@@ -69,7 +69,7 @@ func runSales(cmd *cobra.Command, args []string) error {
 				ReportSubType: salesReportSubType,
 				VendorNumber:  vendor,
 			}
-			records, err := api.GetSalesReport(context.Background(), c, params)
+			records, err := api.GetSalesReport(ctx, c, params)
 			if err != nil {
 				_, _ = fmt.Fprintf(os.Stderr, "warning: %s: %v\n", date, err)
 				continue
@@ -91,30 +91,10 @@ func runSales(cmd *cobra.Command, args []string) error {
 		VendorNumber:  vendor,
 	}
 
-	records, err := api.GetSalesReport(context.Background(), c, params)
+	records, err := api.GetSalesReport(cmd.Context(), c, params)
 	if err != nil {
 		return err
 	}
 
 	return output.Write(os.Stdout, format, records)
-}
-
-func dateRange(from, to string) ([]string, error) {
-	const layout = "2006-01-02"
-	start, err := time.Parse(layout, from)
-	if err != nil {
-		return nil, fmt.Errorf("invalid --from date %q: use YYYY-MM-DD", from)
-	}
-	end, err := time.Parse(layout, to)
-	if err != nil {
-		return nil, fmt.Errorf("invalid --to date %q: use YYYY-MM-DD", to)
-	}
-	if end.Before(start) {
-		return nil, fmt.Errorf("--to must be after --from")
-	}
-	var dates []string
-	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
-		dates = append(dates, d.Format(layout))
-	}
-	return dates, nil
 }

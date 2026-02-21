@@ -33,12 +33,7 @@ func runConfigure(cmd *cobra.Command, args []string) error {
 }
 
 func runValidate(out io.Writer) error {
-	cfgPath := config.DefaultConfigPath()
-	cfg, err := config.Load(cfgPath)
-	if err != nil {
-		return fmt.Errorf("loading config: %w (run 'appc configure' to set up credentials)", err)
-	}
-	if err := config.Validate(cfg); err != nil {
+	if err := config.ValidateFromPath(config.DefaultConfigPath()); err != nil {
 		return err
 	}
 	_, _ = fmt.Fprintln(out, "Configuration is valid.")
