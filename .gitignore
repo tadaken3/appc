@@ -1,0 +1,9 @@
+# Binary
+appc
+
+# Go build cache
+*.test
+*.out
+
+# macOS
+.DS_Store
