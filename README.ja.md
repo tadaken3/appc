@@ -6,16 +6,23 @@ App Store Connect API からデータを取得するコマンドラインツー�
 
 ## インストール
 
+### Homebrew（推奨）
+
+```bash
+brew tap tadaken3/appc
+brew install appc
+```
+
 ### go install
 
 ```bash
-go install github.com/kenta-tanaka/appc@latest
+go install github.com/tadaken3/appc@latest
 ```
 
 ### ソースからビルド
 
 ```bash
-git clone https://github.com/kenta-tanaka/appc.git
+git clone https://github.com/tadaken3/appc.git
 cd appc
 go build -o appc .
 ```
