@@ -2,7 +2,7 @@
 
 [English](README.md) | [日本語](README.ja.md)
 
-A command-line tool for fetching data from the App Store Connect API — apps, sales reports, customer reviews, and analytics.
+A CLI tool for indie developers to fetch App Store Connect data — sales reports, reviews, and analytics — and pipe it into AI tools like Claude Code for growth insights.
 
 ## Installation
 

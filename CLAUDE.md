@@ -2,7 +2,10 @@
 
 ## WHAT: プロジェクト概要
 
-App Store Connect API の CLI ツール（Go 1.25 / cobra）
+App Store Connect API の CLI ツール（Go 1.25 / cobra）。
+
+個人開発者が App Store の売上・レビュー・アナリティクスデータを取得し、
+Claude Code などの AI ツールにパイプして分析・グロースに活用するためのツール。
 
 - データは **stdout**、エラー・ステータスは **stderr** に出力（パイプ連携前提）
 - 認証は JWT（ES256）で行い、トークンは自動キャッシュ・更新

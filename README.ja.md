@@ -2,7 +2,7 @@
 
 [English](README.md) | [日本語](README.ja.md)
 
-App Store Connect API からデータを取得するコマンドラインツールです。アプリ一覧、売上レポート、カスタマーレビュー、アナリティクスに対応しています。
+個人開発者が App Store Connect のデータ（売上レポート・レビュー・アナリティクス）を取得し、Claude Code などの AI ツールにパイプしてアプリのグロースに活用するための CLI ツールです。
 
 ## インストール
 
