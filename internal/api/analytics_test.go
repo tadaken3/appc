@@ -234,3 +234,80 @@ func TestFetchAnalyticsFlow(t *testing.T) {
 		t.Fatalf("len = %d, want 1", len(reports))
 	}
 }
+
+func TestGetAnalyticsReportsPagination(t *testing.T) {
+	page := 0
+	var srvURL string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		page++
+		var resp Response[AnalyticsReportResource]
+		if page == 1 {
+			resp = Response[AnalyticsReportResource]{
+				Data: []AnalyticsReportResource{
+					{ID: "r1", Type: "analyticsReports", Attributes: AnalyticsReportAttributes{Category: "APP_USAGE", Name: "Page1"}},
+				},
+				Links: PagingLinks{Next: srvURL + "/v1/analyticsReportRequests/req-1/reports?cursor=2"},
+			}
+		} else {
+			resp = Response[AnalyticsReportResource]{
+				Data: []AnalyticsReportResource{
+					{ID: "r2", Type: "analyticsReports", Attributes: AnalyticsReportAttributes{Category: "APP_USAGE", Name: "Page2"}},
+				},
+			}
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+	srvURL = srv.URL
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	reports, err := GetAnalyticsReports(context.Background(), c, "req-1", "")
+	if err != nil {
+		t.Fatalf("GetAnalyticsReports() error: %v", err)
+	}
+	if len(reports) != 2 {
+		t.Fatalf("len = %d, want 2", len(reports))
+	}
+	if reports[0].Name != "Page1" || reports[1].Name != "Page2" {
+		t.Errorf("reports = %v", reports)
+	}
+}
+
+func TestGetAnalyticsSegmentsPagination(t *testing.T) {
+	page := 0
+	var srvURL string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		page++
+		var resp Response[AnalyticsSegmentResource]
+		if page == 1 {
+			resp = Response[AnalyticsSegmentResource]{
+				Data: []AnalyticsSegmentResource{
+					{ID: "s1", Type: "analyticsReportSegments", Attributes: AnalyticsSegmentAttributes{URL: "https://example.com/1.csv"}},
+				},
+				Links: PagingLinks{Next: srvURL + "/v1/analyticsReports/rep-1/segments?cursor=2"},
+			}
+		} else {
+			resp = Response[AnalyticsSegmentResource]{
+				Data: []AnalyticsSegmentResource{
+					{ID: "s2", Type: "analyticsReportSegments", Attributes: AnalyticsSegmentAttributes{URL: "https://example.com/2.csv"}},
+				},
+			}
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+	srvURL = srv.URL
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	segments, err := GetAnalyticsSegments(context.Background(), c, "rep-1")
+	if err != nil {
+		t.Fatalf("GetAnalyticsSegments() error: %v", err)
+	}
+	if len(segments) != 2 {
+		t.Fatalf("len = %d, want 2", len(segments))
+	}
+}

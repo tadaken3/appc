@@ -91,6 +91,9 @@ func ListReviews(ctx context.Context, c *client.Client, params ReviewParams) ([]
 				Territory:   r.Attributes.Territory,
 				CreatedDate: r.Attributes.CreatedDate,
 			})
+			if params.Limit > 0 && len(reviews) >= params.Limit {
+				return reviews, nil
+			}
 		}
 
 		path = nextPath(result.Links.Next, c.BaseURL)

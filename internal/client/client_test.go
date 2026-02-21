@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
@@ -89,7 +90,7 @@ func TestRetryExhausted(t *testing.T) {
 	}
 }
 
-func TestErrorResponse(t *testing.T) {
+func TestErrorResponseIncludesBody(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 		w.Write([]byte(`{"errors":[{"detail":"forbidden"}]}`))
@@ -105,6 +106,9 @@ func TestErrorResponse(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "403") {
 		t.Errorf("error = %q, want it to contain 403", err.Error())
+	}
+	if !strings.Contains(err.Error(), "forbidden") {
+		t.Errorf("error = %q, want it to contain response body", err.Error())
 	}
 }
 
@@ -127,5 +131,67 @@ func TestGetRaw(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	if string(body) != "raw data here" {
 		t.Errorf("body = %q, want %q", body, "raw data here")
+	}
+}
+
+func TestPostRetryPreservesBody(t *testing.T) {
+	var attempts int32
+	var lastBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		lastBody = string(body)
+		n := atomic.AddInt32(&attempts, 1)
+		if n < 2 {
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(`{"data":{"id":"123"}}`))
+	}))
+	defer srv.Close()
+
+	c := New(&mockTokenProvider{token: "tok"})
+	c.BaseURL = srv.URL
+	c.MaxRetries = 3
+
+	reqBody := []byte(`{"data":{"type":"test"}}`)
+	resp, err := c.Post(context.Background(), "/v1/test", bytes.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("Post() error: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("status = %d, want 201", resp.StatusCode)
+	}
+	if lastBody != `{"data":{"type":"test"}}` {
+		t.Errorf("retried body = %q, want original body preserved", lastBody)
+	}
+	if atomic.LoadInt32(&attempts) != 2 {
+		t.Errorf("attempts = %d, want 2", attempts)
+	}
+}
+
+func TestRetryAfterParsesSeconds(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  int // seconds
+	}{
+		{"zero", "0", 0},
+		{"five", "5", 5},
+		{"empty", "", 1},
+		{"invalid", "abc", 1},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := retryAfterDuration(tt.value)
+			wantDuration := tt.want * int(1e9) // convert to nanoseconds
+			if int(got) != wantDuration {
+				t.Errorf("retryAfterDuration(%q) = %v, want %ds", tt.value, got, tt.want)
+			}
+		})
 	}
 }

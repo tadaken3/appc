@@ -57,9 +57,9 @@ func prompt(reader *bufio.Reader, out io.Writer, label, current string) string {
 	} else {
 		fmt.Fprintf(out, "%s: ", label)
 	}
-	line, _ := reader.ReadString('\n')
+	line, err := reader.ReadString('\n')
 	line = strings.TrimSpace(line)
-	if line == "" {
+	if err != nil || line == "" {
 		return current
 	}
 	return line

@@ -69,6 +69,7 @@ func TestListApps(t *testing.T) {
 
 func TestListAppsPagination(t *testing.T) {
 	page := 0
+	var srvURL string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		page++
 		var resp Response[AppResource]
@@ -77,7 +78,7 @@ func TestListAppsPagination(t *testing.T) {
 				Data: []AppResource{
 					{ID: "1", Type: "apps", Attributes: AppAttributes{Name: "App1"}},
 				},
-				Links: PagingLinks{Next: r.URL.Query().Get("") + "/v1/apps?cursor=page2"},
+				Links: PagingLinks{Next: srvURL + "/v1/apps?cursor=page2"},
 			}
 		} else {
 			resp = Response[AppResource]{
@@ -89,39 +90,10 @@ func TestListAppsPagination(t *testing.T) {
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
-
-	// Fix the next link to use the test server URL
-	origHandler := srv.Config.Handler
-	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		page := 0
-		origHandler.ServeHTTP(w, r)
-		_ = page
-	})
+	srvURL = srv.URL
 
 	c := client.New(&stubTokenProvider{})
 	c.BaseURL = srv.URL
-
-	// Reset for actual test
-	page = 0
-	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		page++
-		var resp Response[AppResource]
-		if page == 1 {
-			resp = Response[AppResource]{
-				Data: []AppResource{
-					{ID: "1", Type: "apps", Attributes: AppAttributes{Name: "App1"}},
-				},
-				Links: PagingLinks{Next: srv.URL + "/v1/apps?cursor=page2"},
-			}
-		} else {
-			resp = Response[AppResource]{
-				Data: []AppResource{
-					{ID: "2", Type: "apps", Attributes: AppAttributes{Name: "App2"}},
-				},
-			}
-		}
-		json.NewEncoder(w).Encode(resp)
-	})
 
 	apps, err := ListApps(context.Background(), c)
 	if err != nil {

@@ -1,10 +1,12 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -36,8 +38,9 @@ func (c *Client) Get(ctx context.Context, path string) (*http.Response, error) {
 		return nil, err
 	}
 	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		return nil, fmt.Errorf("API error: status %d", resp.StatusCode)
+		return nil, fmt.Errorf("API error: status %d: %s", resp.StatusCode, string(body))
 	}
 	return resp, nil
 }
@@ -60,10 +63,24 @@ func (c *Client) doMethod(ctx context.Context, method, path string, body io.Read
 		return nil, fmt.Errorf("getting token: %w", err)
 	}
 
+	// Buffer body for retry support
+	var bodyBytes []byte
+	if body != nil {
+		bodyBytes, err = io.ReadAll(body)
+		if err != nil {
+			return nil, fmt.Errorf("reading request body: %w", err)
+		}
+	}
+
 	url := c.BaseURL + path
 
 	for attempt := 0; attempt <= c.MaxRetries; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, method, url, body)
+		var reqBody io.Reader
+		if bodyBytes != nil {
+			reqBody = bytes.NewReader(bodyBytes)
+		}
+
+		req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
 		if err != nil {
 			return nil, fmt.Errorf("creating request: %w", err)
 		}
@@ -79,10 +96,7 @@ func (c *Client) doMethod(ctx context.Context, method, path string, body io.Read
 
 		if resp.StatusCode == http.StatusTooManyRequests && attempt < c.MaxRetries {
 			resp.Body.Close()
-			wait := 1 * time.Second
-			if ra := resp.Header.Get("Retry-After"); ra == "0" {
-				wait = 0
-			}
+			wait := retryAfterDuration(resp.Header.Get("Retry-After"))
 			if wait > 0 {
 				time.Sleep(wait)
 			}
@@ -93,4 +107,15 @@ func (c *Client) doMethod(ctx context.Context, method, path string, body io.Read
 	}
 
 	return nil, fmt.Errorf("API error: status 429 after %d retries", c.MaxRetries)
+}
+
+func retryAfterDuration(value string) time.Duration {
+	if value == "" {
+		return 1 * time.Second
+	}
+	seconds, err := strconv.Atoi(value)
+	if err != nil {
+		return 1 * time.Second
+	}
+	return time.Duration(seconds) * time.Second
 }

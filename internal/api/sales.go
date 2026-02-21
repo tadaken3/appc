@@ -126,42 +126,54 @@ func parseTSV(r io.Reader) ([]SalesRecord, error) {
 		return nil, nil
 	}
 
+	// Build header-to-index map
+	headerIdx := make(map[string]int, len(lines[0]))
+	for i, h := range lines[0] {
+		headerIdx[h] = i
+	}
+
+	field := func(fields []string, header string) string {
+		if idx, ok := headerIdx[header]; ok && idx < len(fields) {
+			return fields[idx]
+		}
+		return ""
+	}
+
 	var records []SalesRecord
 	for _, fields := range lines[1:] {
-		// Skip empty lines
 		if len(fields) == 0 || (len(fields) == 1 && strings.TrimSpace(fields[0]) == "") {
 			continue
 		}
-		rec := SalesRecord{}
-		if len(fields) > 0 { rec.Provider = fields[0] }
-		if len(fields) > 1 { rec.ProviderCountry = fields[1] }
-		if len(fields) > 2 { rec.SKU = fields[2] }
-		if len(fields) > 3 { rec.Developer = fields[3] }
-		if len(fields) > 4 { rec.Title = fields[4] }
-		if len(fields) > 5 { rec.Version = fields[5] }
-		if len(fields) > 6 { rec.ProductType = fields[6] }
-		if len(fields) > 7 { rec.Units = fields[7] }
-		if len(fields) > 8 { rec.DeveloperProceeds = fields[8] }
-		if len(fields) > 9 { rec.BeginDate = fields[9] }
-		if len(fields) > 10 { rec.EndDate = fields[10] }
-		if len(fields) > 11 { rec.CustomerCurrency = fields[11] }
-		if len(fields) > 12 { rec.CountryCode = fields[12] }
-		if len(fields) > 13 { rec.CurrencyProceeds = fields[13] }
-		if len(fields) > 14 { rec.AppleIdentifier = fields[14] }
-		if len(fields) > 15 { rec.CustomerPrice = fields[15] }
-		if len(fields) > 16 { rec.PromoCode = fields[16] }
-		if len(fields) > 17 { rec.ParentIdentifier = fields[17] }
-		if len(fields) > 18 { rec.Subscription = fields[18] }
-		if len(fields) > 19 { rec.Period = fields[19] }
-		if len(fields) > 20 { rec.Category = fields[20] }
-		if len(fields) > 21 { rec.CMB = fields[21] }
-		if len(fields) > 22 { rec.Device = fields[22] }
-		if len(fields) > 23 { rec.SupportedPlatforms = fields[23] }
-		if len(fields) > 24 { rec.ProceedsReason = fields[24] }
-		if len(fields) > 25 { rec.PreservedPricing = fields[25] }
-		if len(fields) > 26 { rec.Client = fields[26] }
-		if len(fields) > 27 { rec.OrderType = fields[27] }
-		records = append(records, rec)
+		records = append(records, SalesRecord{
+			Provider:           field(fields, "Provider"),
+			ProviderCountry:    field(fields, "Provider Country"),
+			SKU:                field(fields, "SKU"),
+			Developer:          field(fields, "Developer"),
+			Title:              field(fields, "Title"),
+			Version:            field(fields, "Version"),
+			ProductType:        field(fields, "Product Type Identifier"),
+			Units:              field(fields, "Units"),
+			DeveloperProceeds:  field(fields, "Developer Proceeds"),
+			BeginDate:          field(fields, "Begin Date"),
+			EndDate:            field(fields, "End Date"),
+			CustomerCurrency:   field(fields, "Customer Currency"),
+			CountryCode:        field(fields, "Country Code"),
+			CurrencyProceeds:   field(fields, "Currency of Proceeds"),
+			AppleIdentifier:    field(fields, "Apple Identifier"),
+			CustomerPrice:      field(fields, "Customer Price"),
+			PromoCode:          field(fields, "Promo Code"),
+			ParentIdentifier:   field(fields, "Parent Identifier"),
+			Subscription:       field(fields, "Subscription"),
+			Period:             field(fields, "Period"),
+			Category:           field(fields, "Category"),
+			CMB:                field(fields, "CMB"),
+			Device:             field(fields, "Device"),
+			SupportedPlatforms: field(fields, "Supported Platforms"),
+			ProceedsReason:     field(fields, "Proceeds Reason"),
+			PreservedPricing:   field(fields, "Preserved Pricing"),
+			Client:             field(fields, "Client"),
+			OrderType:          field(fields, "Order Type"),
+		})
 	}
 
 	return records, nil

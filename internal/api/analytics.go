@@ -135,28 +135,32 @@ func GetAnalyticsReports(ctx context.Context, c *client.Client, requestID, categ
 		path += "?" + encoded
 	}
 
-	resp, err := c.Get(ctx, path)
-	if err != nil {
-		return nil, fmt.Errorf("getting analytics reports: %w", err)
-	}
-	body, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		return nil, fmt.Errorf("reading response: %w", err)
-	}
-
-	var result Response[AnalyticsReportResource]
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("parsing response: %w", err)
-	}
-
 	var reports []AnalyticsReport
-	for _, r := range result.Data {
-		reports = append(reports, AnalyticsReport{
-			ID:       r.ID,
-			Category: r.Attributes.Category,
-			Name:     r.Attributes.Name,
-		})
+	for path != "" {
+		resp, err := c.Get(ctx, path)
+		if err != nil {
+			return nil, fmt.Errorf("getting analytics reports: %w", err)
+		}
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("reading response: %w", err)
+		}
+
+		var result Response[AnalyticsReportResource]
+		if err := json.Unmarshal(body, &result); err != nil {
+			return nil, fmt.Errorf("parsing response: %w", err)
+		}
+
+		for _, r := range result.Data {
+			reports = append(reports, AnalyticsReport{
+				ID:       r.ID,
+				Category: r.Attributes.Category,
+				Name:     r.Attributes.Name,
+			})
+		}
+
+		path = nextPath(result.Links.Next, c.BaseURL)
 	}
 
 	return reports, nil
@@ -165,29 +169,33 @@ func GetAnalyticsReports(ctx context.Context, c *client.Client, requestID, categ
 func GetAnalyticsSegments(ctx context.Context, c *client.Client, reportID string) ([]AnalyticsSegment, error) {
 	path := fmt.Sprintf("/v1/analyticsReports/%s/segments", reportID)
 
-	resp, err := c.Get(ctx, path)
-	if err != nil {
-		return nil, fmt.Errorf("getting analytics segments: %w", err)
-	}
-	body, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		return nil, fmt.Errorf("reading response: %w", err)
-	}
-
-	var result Response[AnalyticsSegmentResource]
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("parsing response: %w", err)
-	}
-
 	var segments []AnalyticsSegment
-	for _, s := range result.Data {
-		segments = append(segments, AnalyticsSegment{
-			ID:          s.ID,
-			URL:         s.Attributes.URL,
-			CheckSum:    s.Attributes.CheckSum,
-			SizeInBytes: s.Attributes.SizeInBytes,
-		})
+	for path != "" {
+		resp, err := c.Get(ctx, path)
+		if err != nil {
+			return nil, fmt.Errorf("getting analytics segments: %w", err)
+		}
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("reading response: %w", err)
+		}
+
+		var result Response[AnalyticsSegmentResource]
+		if err := json.Unmarshal(body, &result); err != nil {
+			return nil, fmt.Errorf("parsing response: %w", err)
+		}
+
+		for _, s := range result.Data {
+			segments = append(segments, AnalyticsSegment{
+				ID:          s.ID,
+				URL:         s.Attributes.URL,
+				CheckSum:    s.Attributes.CheckSum,
+				SizeInBytes: s.Attributes.SizeInBytes,
+			})
+		}
+
+		path = nextPath(result.Links.Next, c.BaseURL)
 	}
 
 	return segments, nil

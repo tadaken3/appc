@@ -111,6 +111,7 @@ func TestListReviewsWithRatingFilter(t *testing.T) {
 
 func TestListReviewsPagination(t *testing.T) {
 	page := 0
+	var srvURL string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		page++
 		var resp Response[ReviewResource]
@@ -119,7 +120,7 @@ func TestListReviewsPagination(t *testing.T) {
 				Data: []ReviewResource{
 					{ID: "r1", Type: "customerReviews", Attributes: ReviewAttributes{Title: "First"}},
 				},
-				Links: PagingLinks{Next: "PLACEHOLDER"},
+				Links: PagingLinks{Next: srvURL + "/v1/apps/APP1/customerReviews?cursor=2"},
 			}
 		} else {
 			resp = Response[ReviewResource]{
@@ -131,28 +132,7 @@ func TestListReviewsPagination(t *testing.T) {
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
-
-	// Replace placeholder with actual server URL
-	page = 0
-	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		page++
-		var resp Response[ReviewResource]
-		if page == 1 {
-			resp = Response[ReviewResource]{
-				Data: []ReviewResource{
-					{ID: "r1", Type: "customerReviews", Attributes: ReviewAttributes{Title: "First"}},
-				},
-				Links: PagingLinks{Next: srv.URL + "/v1/apps/APP1/customerReviews?cursor=2"},
-			}
-		} else {
-			resp = Response[ReviewResource]{
-				Data: []ReviewResource{
-					{ID: "r2", Type: "customerReviews", Attributes: ReviewAttributes{Title: "Second"}},
-				},
-			}
-		}
-		json.NewEncoder(w).Encode(resp)
-	})
+	srvURL = srv.URL
 
 	c := client.New(&stubTokenProvider{})
 	c.BaseURL = srv.URL
@@ -164,6 +144,39 @@ func TestListReviewsPagination(t *testing.T) {
 
 	if len(reviews) != 2 {
 		t.Fatalf("len = %d, want 2", len(reviews))
+	}
+}
+
+func TestListReviewsLimitStopsPagination(t *testing.T) {
+	page := 0
+	var srvURL string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		page++
+		resp := Response[ReviewResource]{
+			Data: []ReviewResource{
+				{ID: "r1", Type: "customerReviews", Attributes: ReviewAttributes{Title: "Review"}},
+				{ID: "r2", Type: "customerReviews", Attributes: ReviewAttributes{Title: "Review2"}},
+			},
+			Links: PagingLinks{Next: srvURL + "/v1/apps/APP1/customerReviews?cursor=next"},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+	srvURL = srv.URL
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	reviews, err := ListReviews(context.Background(), c, ReviewParams{AppID: "APP1", Limit: 1})
+	if err != nil {
+		t.Fatalf("ListReviews() error: %v", err)
+	}
+
+	if len(reviews) != 1 {
+		t.Errorf("len = %d, want 1 (should stop at limit)", len(reviews))
+	}
+	if page != 1 {
+		t.Errorf("pages fetched = %d, want 1 (should not fetch next page)", page)
 	}
 }
 

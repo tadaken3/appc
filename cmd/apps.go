@@ -25,11 +25,10 @@ func init() {
 }
 
 func runApps(cmd *cobra.Command, args []string) error {
-	cfg, c, err := buildClient()
+	_, c, err := buildClient()
 	if err != nil {
 		return err
 	}
-	_ = cfg
 
 	apps, err := api.ListApps(context.Background(), c)
 	if err != nil {
