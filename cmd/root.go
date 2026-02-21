@@ -5,11 +5,13 @@ import (
 )
 
 var format string
+var version = "dev"
 
 var rootCmd = &cobra.Command{
-	Use:   "appc",
-	Short: "App Store Connect CLI tool",
-	Long:  "A CLI tool for fetching App Store Connect data (sales reports, reviews, analytics).",
+	Use:     "appc",
+	Short:   "App Store Connect CLI tool",
+	Long:    "A CLI tool for fetching App Store Connect data (sales reports, reviews, analytics).",
+	Version: version,
 }
 
 func init() {
