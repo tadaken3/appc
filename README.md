@@ -1,45 +1,75 @@
 # appc - App Store Connect CLI
 
-A CLI tool for fetching App Store Connect data (apps, sales reports, reviews, analytics).
+[English](README.md) | [日本語](README.ja.md)
 
-## Setup
+A command-line tool for fetching data from the App Store Connect API — apps, sales reports, customer reviews, and analytics.
+
+## Installation
+
+### go install
 
 ```bash
 go install github.com/kenta-tanaka/appc@latest
 ```
 
-Or build from source:
+### Build from source
 
 ```bash
+git clone https://github.com/kenta-tanaka/appc.git
+cd appc
 go build -o appc .
 ```
 
-## Configuration
+## Setup
 
-Set up your App Store Connect API credentials:
+### 1. Create an API Key
+
+1. Open [App Store Connect](https://appstoreconnect.apple.com/) and navigate to **Users and Access > Integrations > App Store Connect API**.
+2. Click **Generate API Key** and select a role (e.g., Admin, Finance).
+3. Download the `.p8` private key file. **This can only be downloaded once.**
+4. Note down the **Key ID** and the **Issuer ID** shown on the page.
+
+### 2. Configure appc
+
+Run the interactive setup:
 
 ```bash
 appc configure
 ```
 
-You'll need:
-- **Issuer ID** - from App Store Connect > Users and Access > Keys
-- **Key ID** - from the API key you created
-- **Private Key Path** - path to the `.p8` file downloaded when creating the key
-- **Vendor Number** - your vendor number for sales reports
+You will be prompted for:
 
-Config is saved to `~/.config/appc/config.json` with `0600` permissions.
+| Prompt | Description |
+|---|---|
+| **Issuer ID** | UUID shown in App Store Connect > Users and Access > Keys |
+| **Key ID** | Alphanumeric ID of the API key you created |
+| **Private Key Path** | Path to the `.p8` file (supports `~` expansion) |
+| **Vendor Number** | Your vendor number for sales reports |
 
-## Usage
+Configuration is saved to `~/.config/appc/config.json` with `0600` permissions.
 
-### List Apps
+## Commands
+
+### `appc apps`
+
+List all apps in your App Store Connect account.
 
 ```bash
 appc apps
 appc apps --format csv
 ```
 
-### Sales Reports
+### `appc sales`
+
+Download sales and trends reports.
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--date` | string | *(required)* | Report date (`YYYY-MM-DD` or `YYYY-MM`) |
+| `--type` | string | `SALES` | Report type: `SALES`, `PRE_ORDER`, `NEWSSTAND` |
+| `--frequency` | string | `DAILY` | Frequency: `DAILY`, `WEEKLY`, `MONTHLY`, `YEARLY` |
+| `--sub-type` | string | `SUMMARY` | Sub type: `SUMMARY`, `DETAILED`, `OPT_IN` |
+| `--vendor` | string | *(from config)* | Vendor number (overrides config value) |
 
 ```bash
 appc sales --date 2025-01-15
@@ -47,7 +77,15 @@ appc sales --date 2025-01-15 --type SALES --frequency DAILY --format csv
 appc sales --date 2025-01 --frequency MONTHLY --vendor 12345678
 ```
 
-### Customer Reviews
+### `appc reviews`
+
+Retrieve customer reviews for an app.
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--app` | string | *(required)* | App ID |
+| `--rating` | int | `0` | Filter by star rating (1–5; 0 = all) |
+| `--limit` | int | `100` | Maximum number of reviews to return |
 
 ```bash
 appc reviews --app <APP_ID>
@@ -55,46 +93,93 @@ appc reviews --app <APP_ID> --rating 5 --limit 50
 appc reviews --app <APP_ID> --format csv > reviews.csv
 ```
 
-### Analytics
+### `appc analytics`
+
+Request and retrieve App Store analytics reports.
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--app` | string | *(required)* | App ID |
+| `--category` | string | | Report category (e.g., `APP_USAGE`, `APP_STORE_ENGAGEMENT`) |
 
 ```bash
 appc analytics --app <APP_ID>
 appc analytics --app <APP_ID> --category APP_USAGE
 ```
 
-### Global Flags
+### `appc configure`
 
-- `--format json|csv` - Output format (default: json)
+Interactively set up or update authentication credentials. Existing values are shown as defaults — press Enter to keep them.
+
+## Global Flags
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--format` | string | `json` | Output format: `json` or `csv` |
+
+Applies to all commands.
 
 ## Output
 
-- Data goes to **stdout** (pipe-friendly)
-- Status messages and errors go to **stderr**
+- **Data** is written to **stdout** (pipe-friendly).
+- **Status messages and errors** are written to **stderr**.
 
 ```bash
-# Pipe to jq for analysis
+# Filter with jq
 appc apps | jq '.[].name'
-
-# Pipe to Claude Code
-appc reviews --app <ID> --format json | claude "Analyze these reviews"
 
 # Export to CSV
 appc sales --date 2025-01-15 --format csv > sales.csv
+
+# Pipe to Claude Code for analysis
+appc reviews --app <APP_ID> --format json | claude "Summarize the sentiment of these reviews"
+```
+
+## Project Structure
+
+```
+appc/
+├── main.go                 # Entry point
+├── cmd/                    # CLI command definitions (cobra)
+│   ├── root.go             #   Root command and global flags
+│   ├── apps.go             #   appc apps
+│   ├── sales.go            #   appc sales
+│   ├── reviews.go          #   appc reviews
+│   ├── analytics.go        #   appc analytics
+│   └── configure.go        #   appc configure
+└── internal/
+    ├── api/                # App Store Connect API clients
+    │   ├── types.go        #   Shared response/paging types
+    │   ├── apps.go         #   Apps endpoint
+    │   ├── sales.go        #   Sales reports endpoint
+    │   ├── reviews.go      #   Reviews endpoint
+    │   └── analytics.go    #   Analytics endpoint
+    ├── auth/               # JWT (ES256) token generation
+    │   └── jwt.go
+    ├── client/             # HTTP client with retry and auth
+    │   └── client.go
+    ├── config/             # Configuration load/save
+    │   └── config.go
+    └── output/             # JSON/CSV output formatting
+        └── formatter.go
 ```
 
 ## Development
 
 ```bash
-# Run tests
+# Run all tests
 go test ./...
 
-# Run tests with verbose output
+# Verbose output
 go test ./... -v
 ```
 
 ## Authentication
 
-Uses JWT (ES256) tokens for the App Store Connect API. Tokens are:
-- Valid for 20 minutes
-- Automatically cached and refreshed
-- Generated using your `.p8` private key
+appc authenticates with the App Store Connect API using **JWT signed with ES256** (ECDSA P-256 + SHA-256).
+
+- The token is created from your **Issuer ID**, **Key ID**, and `.p8` **private key**.
+- Claims include `iss`, `iat`, `exp`, and `aud` (`appstoreconnect-v1`).
+- Tokens are **valid for 20 minutes** and automatically cached.
+- A cached token is refreshed when it is within 1 minute of expiry.
+- Token generation is thread-safe.
