@@ -47,15 +47,15 @@ func runConfigureWith(in io.Reader, out io.Writer) error {
 		return fmt.Errorf("saving config: %w", err)
 	}
 
-	fmt.Fprintf(out, "\nConfiguration saved to %s\n", cfgPath)
+	_, _ = fmt.Fprintf(out, "\nConfiguration saved to %s\n", cfgPath)
 	return nil
 }
 
 func prompt(reader *bufio.Reader, out io.Writer, label, current string) string {
 	if current != "" {
-		fmt.Fprintf(out, "%s [%s]: ", label, current)
+		_, _ = fmt.Fprintf(out, "%s [%s]: ", label, current)
 	} else {
-		fmt.Fprintf(out, "%s: ", label)
+		_, _ = fmt.Fprintf(out, "%s: ", label)
 	}
 	line, err := reader.ReadString('\n')
 	line = strings.TrimSpace(line)

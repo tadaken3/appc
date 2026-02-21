@@ -26,7 +26,7 @@ func init() {
 	reviewsCmd.Flags().StringVar(&reviewsAppID, "app", "", "App ID (required)")
 	reviewsCmd.Flags().IntVar(&reviewsRating, "rating", 0, "Filter by rating (1-5)")
 	reviewsCmd.Flags().IntVar(&reviewsLimit, "limit", 100, "Maximum number of reviews")
-	reviewsCmd.MarkFlagRequired("app")
+	_ = reviewsCmd.MarkFlagRequired("app")
 	rootCmd.AddCommand(reviewsCmd)
 }
 

@@ -18,7 +18,7 @@ func gzipTSV(t *testing.T, data string) []byte {
 	if _, err := gz.Write([]byte(data)); err != nil {
 		t.Fatalf("gzip write: %v", err)
 	}
-	gz.Close()
+	_ = gz.Close()
 	return buf.Bytes()
 }
 
@@ -41,7 +41,7 @@ func TestGetSalesReport(t *testing.T) {
 
 		w.Header().Set("Content-Encoding", "gzip")
 		w.WriteHeader(http.StatusOK)
-		w.Write(gzipTSV(t, tsvData))
+		_, _ = w.Write(gzipTSV(t, tsvData))
 	}))
 	defer srv.Close()
 
@@ -111,7 +111,7 @@ func TestSalesReportEmpty(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		// Just the header, no data rows
 		tsvData := "Provider\tProvider Country\tSKU\tDeveloper\tTitle\tVersion\tProduct Type Identifier\tUnits\tDeveloper Proceeds\tBegin Date\tEnd Date\tCustomer Currency\tCountry Code\tCurrency of Proceeds\tApple Identifier\tCustomer Price\tPromo Code\tParent Identifier\tSubscription\tPeriod\tCategory\tCMB\tDevice\tSupported Platforms\tProceeds Reason\tPreserved Pricing\tClient\tOrder Type\n"
-		w.Write(gzipTSV(t, tsvData))
+		_, _ = w.Write(gzipTSV(t, tsvData))
 	}))
 	defer srv.Close()
 

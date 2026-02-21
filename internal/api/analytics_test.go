@@ -37,7 +37,7 @@ func TestRequestAnalyticsReport(t *testing.T) {
 				} `json:"relationships"`
 			} `json:"data"`
 		}
-		json.NewDecoder(r.Body).Decode(&reqBody)
+		_ = json.NewDecoder(r.Body).Decode(&reqBody)
 
 		if reqBody.Data.Relationships.App.Data.ID != "APP123" {
 			t.Errorf("appID = %q", reqBody.Data.Relationships.App.Data.ID)
@@ -53,7 +53,7 @@ func TestRequestAnalyticsReport(t *testing.T) {
 			},
 		}
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 
@@ -96,7 +96,7 @@ func TestGetAnalyticsReports(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 
@@ -126,7 +126,7 @@ func TestGetAnalyticsReportsWithCategory(t *testing.T) {
 				{ID: "r1", Type: "analyticsReports", Attributes: AnalyticsReportAttributes{Category: "APP_USAGE"}},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 
@@ -157,7 +157,7 @@ func TestGetAnalyticsSegments(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 
@@ -199,7 +199,7 @@ func TestFetchAnalyticsFlow(t *testing.T) {
 				Data: AnalyticsReportRequestResource{ID: "req-1", Type: "analyticsReportRequests"},
 			}
 			w.WriteHeader(http.StatusCreated)
-			json.NewEncoder(w).Encode(resp)
+			_ = json.NewEncoder(w).Encode(resp)
 
 		case r.URL.Path == "/v1/analyticsReportRequests/req-1/reports":
 			resp := Response[AnalyticsReportResource]{
@@ -207,7 +207,7 @@ func TestFetchAnalyticsFlow(t *testing.T) {
 					{ID: "rep-1", Type: "analyticsReports", Attributes: AnalyticsReportAttributes{Category: "APP_USAGE", Name: "Usage"}},
 				},
 			}
-			json.NewEncoder(w).Encode(resp)
+			_ = json.NewEncoder(w).Encode(resp)
 
 		default:
 			t.Logf("call %d: %s %s", n, r.Method, r.URL.Path)
@@ -255,7 +255,7 @@ func TestGetAnalyticsReportsPagination(t *testing.T) {
 				},
 			}
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 	srvURL = srv.URL
@@ -295,7 +295,7 @@ func TestGetAnalyticsSegmentsPagination(t *testing.T) {
 				},
 			}
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 	srvURL = srv.URL
