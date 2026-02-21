@@ -44,6 +44,25 @@ func expandHome(path string) string {
 	return path
 }
 
+func Validate(cfg *Config) error {
+	if cfg.IssuerID == "" {
+		return fmt.Errorf("issuer_id is not set: run 'appc configure'")
+	}
+	if cfg.KeyID == "" {
+		return fmt.Errorf("key_id is not set: run 'appc configure'")
+	}
+	if cfg.PrivateKeyPath == "" {
+		return fmt.Errorf("private_key_path is not set: run 'appc configure'")
+	}
+	if _, err := os.Stat(cfg.PrivateKeyPath); os.IsNotExist(err) {
+		return fmt.Errorf("private key file not found: %s", cfg.PrivateKeyPath)
+	}
+	if cfg.VendorNumber == "" {
+		return fmt.Errorf("vendor_number is not set: run 'appc configure'")
+	}
+	return nil
+}
+
 func Save(cfg *Config, path string) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0700); err != nil {
