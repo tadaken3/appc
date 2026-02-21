@@ -91,7 +91,7 @@ func GetSalesReport(ctx context.Context, c *client.Client, params SalesReportPar
 	if err != nil {
 		return nil, fmt.Errorf("fetching sales report: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
@@ -104,7 +104,7 @@ func GetSalesReport(ctx context.Context, c *client.Client, params SalesReportPar
 		if err != nil {
 			return nil, fmt.Errorf("decompressing response: %w", err)
 		}
-		defer gz.Close()
+		defer func() { _ = gz.Close() }()
 		reader = gz
 	}
 

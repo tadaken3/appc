@@ -25,7 +25,7 @@ var analyticsCmd = &cobra.Command{
 func init() {
 	analyticsCmd.Flags().StringVar(&analyticsAppID, "app", "", "App ID (required)")
 	analyticsCmd.Flags().StringVar(&analyticsCategory, "category", "", "Report category (e.g., APP_USAGE, APP_STORE_ENGAGEMENT)")
-	analyticsCmd.MarkFlagRequired("app")
+	_ = analyticsCmd.MarkFlagRequired("app")
 	rootCmd.AddCommand(analyticsCmd)
 }
 

@@ -105,7 +105,7 @@ func RequestAnalyticsReport(ctx context.Context, c *client.Client, appID string)
 	if err != nil {
 		return "", fmt.Errorf("requesting analytics report: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -142,7 +142,7 @@ func GetAnalyticsReports(ctx context.Context, c *client.Client, requestID, categ
 			return nil, fmt.Errorf("getting analytics reports: %w", err)
 		}
 		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if err != nil {
 			return nil, fmt.Errorf("reading response: %w", err)
 		}
@@ -176,7 +176,7 @@ func GetAnalyticsSegments(ctx context.Context, c *client.Client, reportID string
 			return nil, fmt.Errorf("getting analytics segments: %w", err)
 		}
 		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if err != nil {
 			return nil, fmt.Errorf("reading response: %w", err)
 		}

@@ -24,7 +24,7 @@ func TestAuthorizationHeader(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{}`))
+		_, _ = w.Write([]byte(`{}`))
 	}))
 	defer srv.Close()
 
@@ -51,7 +51,7 @@ func TestRetryOn429(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"data":[]}`))
+		_, _ = w.Write([]byte(`{"data":[]}`))
 	}))
 	defer srv.Close()
 
@@ -63,7 +63,7 @@ func TestRetryOn429(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get() error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("status = %d, want 200", resp.StatusCode)
@@ -93,7 +93,7 @@ func TestRetryExhausted(t *testing.T) {
 func TestErrorResponseIncludesBody(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(`{"errors":[{"detail":"forbidden"}]}`))
+		_, _ = w.Write([]byte(`{"errors":[{"detail":"forbidden"}]}`))
 	}))
 	defer srv.Close()
 
@@ -115,7 +115,7 @@ func TestErrorResponseIncludesBody(t *testing.T) {
 func TestGetRaw(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("raw data here"))
+		_, _ = w.Write([]byte("raw data here"))
 	}))
 	defer srv.Close()
 
@@ -126,7 +126,7 @@ func TestGetRaw(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetRaw() error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 	if string(body) != "raw data here" {
@@ -147,7 +147,7 @@ func TestPostRetryPreservesBody(t *testing.T) {
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte(`{"data":{"id":"123"}}`))
+		_, _ = w.Write([]byte(`{"data":{"id":"123"}}`))
 	}))
 	defer srv.Close()
 
@@ -160,7 +160,7 @@ func TestPostRetryPreservesBody(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Post() error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		t.Errorf("status = %d, want 201", resp.StatusCode)

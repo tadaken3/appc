@@ -71,7 +71,7 @@ func ListReviews(ctx context.Context, c *client.Client, params ReviewParams) ([]
 			return nil, fmt.Errorf("listing reviews: %w", err)
 		}
 		body, err := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if err != nil {
 			return nil, fmt.Errorf("reading response: %w", err)
 		}

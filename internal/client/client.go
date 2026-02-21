@@ -39,7 +39,7 @@ func (c *Client) Get(ctx context.Context, path string) (*http.Response, error) {
 	}
 	if resp.StatusCode >= 400 {
 		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		return nil, fmt.Errorf("API error: status %d: %s", resp.StatusCode, string(body))
 	}
 	return resp, nil
@@ -95,7 +95,7 @@ func (c *Client) doMethod(ctx context.Context, method, path string, body io.Read
 		}
 
 		if resp.StatusCode == http.StatusTooManyRequests && attempt < c.MaxRetries {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			wait := retryAfterDuration(resp.Header.Get("Retry-After"))
 			if wait > 0 {
 				time.Sleep(wait)

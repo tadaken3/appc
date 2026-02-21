@@ -41,7 +41,7 @@ func TestListApps(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 
@@ -87,7 +87,7 @@ func TestListAppsPagination(t *testing.T) {
 				},
 			}
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 	srvURL = srv.URL
@@ -110,7 +110,7 @@ func TestListAppsPagination(t *testing.T) {
 
 func TestListAppsEmpty(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(Response[AppResource]{Data: []AppResource{}})
+		_ = json.NewEncoder(w).Encode(Response[AppResource]{Data: []AppResource{}})
 	}))
 	defer srv.Close()
 

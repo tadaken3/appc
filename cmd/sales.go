@@ -30,7 +30,7 @@ func init() {
 	salesCmd.Flags().StringVar(&salesFrequency, "frequency", "DAILY", "Report frequency (DAILY, WEEKLY, MONTHLY, YEARLY)")
 	salesCmd.Flags().StringVar(&salesReportSubType, "sub-type", "SUMMARY", "Report sub type (SUMMARY, DETAILED, OPT_IN)")
 	salesCmd.Flags().StringVar(&salesVendorNumber, "vendor", "", "Vendor number (overrides config)")
-	salesCmd.MarkFlagRequired("date")
+	_ = salesCmd.MarkFlagRequired("date")
 	rootCmd.AddCommand(salesCmd)
 }
 

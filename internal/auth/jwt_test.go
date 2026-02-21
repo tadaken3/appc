@@ -30,7 +30,7 @@ func generateTestP8Key(t *testing.T) string {
 	if err != nil {
 		t.Fatalf("creating file: %v", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	if err := pem.Encode(f, block); err != nil {
 		t.Fatalf("encoding pem: %v", err)
 	}
