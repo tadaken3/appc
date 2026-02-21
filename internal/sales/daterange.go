@@ -11,11 +11,11 @@ const dateLayout = "2006-01-02"
 func DateRange(from, to string) ([]string, error) {
 	start, err := time.Parse(dateLayout, from)
 	if err != nil {
-		return nil, fmt.Errorf("invalid --from date %q: %w: use YYYY-MM-DD", from, err)
+		return nil, fmt.Errorf("invalid --from date %q (use YYYY-MM-DD): %w", from, err)
 	}
 	end, err := time.Parse(dateLayout, to)
 	if err != nil {
-		return nil, fmt.Errorf("invalid --to date %q: %w: use YYYY-MM-DD", to, err)
+		return nil, fmt.Errorf("invalid --to date %q (use YYYY-MM-DD): %w", to, err)
 	}
 	if end.Before(start) {
 		return nil, fmt.Errorf("--to must be after --from")
