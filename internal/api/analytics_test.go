@@ -212,7 +212,7 @@ func TestFetchAnalyticsFlow(t *testing.T) {
 		default:
 			t.Logf("call %d: %s %s", n, r.Method, r.URL.Path)
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, `{"data":[]}`)
+			_, _ = fmt.Fprintf(w, `{"data":[]}`)
 		}
 	}))
 	defer srv.Close()

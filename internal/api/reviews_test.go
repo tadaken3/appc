@@ -45,7 +45,7 @@ func TestListReviews(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 
@@ -92,7 +92,7 @@ func TestListReviewsWithRatingFilter(t *testing.T) {
 				},
 			},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 
@@ -129,7 +129,7 @@ func TestListReviewsPagination(t *testing.T) {
 				},
 			}
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 	srvURL = srv.URL
@@ -159,7 +159,7 @@ func TestListReviewsLimitStopsPagination(t *testing.T) {
 			},
 			Links: PagingLinks{Next: srvURL + "/v1/apps/APP1/customerReviews?cursor=next"},
 		}
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 	srvURL = srv.URL
