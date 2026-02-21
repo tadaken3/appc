@@ -55,7 +55,7 @@ git switch -c hotfix/critical-bug
 ```bash
 git switch develop
 git pull origin develop
-git switch -c release/v0.0.3
+git switch -c release/vX.Y.Z
 ```
 
 ### 2. バージョンに関する最終調整
@@ -71,8 +71,8 @@ release ブランチから main への PR を作成・マージする。
 ```bash
 git switch main
 git pull origin main
-git tag v0.0.3
-git push origin v0.0.3
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
 タグを push すると GitHub Actions（`.github/workflows/release.yml`）が自動的に起動し、以下が実行される：
@@ -87,7 +87,7 @@ release ブランチを develop にもマージして差分をなくす。
 
 ```bash
 git switch develop
-git merge release/v0.0.3
+git merge --no-ff release/vX.Y.Z
 git push origin develop
 ```
 
@@ -105,3 +105,13 @@ PR 作成時・main/develop への push 時に以下が自動実行される：
 | test | ビルド + テスト（race detector・カバレッジ付き） |
 | lint | golangci-lint |
 | vet | go vet |
+
+ローカルで CI と同等のテストを実行する場合：
+
+```bash
+# race detector・カバレッジ付きの完全なテスト
+go test ./... -v -race -coverprofile=coverage.out
+
+# カバレッジをブラウザで確認
+go tool cover -html=coverage.out
+```
