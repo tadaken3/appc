@@ -1,11 +1,14 @@
 package api
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -309,5 +312,227 @@ func TestGetAnalyticsSegmentsPagination(t *testing.T) {
 	}
 	if len(segments) != 2 {
 		t.Fatalf("len = %d, want 2", len(segments))
+	}
+}
+
+func TestParseAnalyticsCSV(t *testing.T) {
+	csvData := "Date,App Name,Downloads\n2024-01-01,MyApp,100\n2024-01-02,MyApp,200\n"
+	records, err := ParseAnalyticsCSV(strings.NewReader(csvData))
+	if err != nil {
+		t.Fatalf("ParseAnalyticsCSV() error: %v", err)
+	}
+
+	if len(records) != 2 {
+		t.Fatalf("len = %d, want 2", len(records))
+	}
+
+	headers := records[0].CSVHeaders()
+	if len(headers) != 3 {
+		t.Fatalf("headers len = %d, want 3", len(headers))
+	}
+	if headers[0] != "Date" || headers[1] != "App Name" || headers[2] != "Downloads" {
+		t.Errorf("headers = %v", headers)
+	}
+
+	row := records[0].CSVRow()
+	if row[0] != "2024-01-01" || row[1] != "MyApp" || row[2] != "100" {
+		t.Errorf("row = %v", row)
+	}
+
+	row2 := records[1].CSVRow()
+	if row2[2] != "200" {
+		t.Errorf("row2[2] = %q, want 200", row2[2])
+	}
+}
+
+func TestParseAnalyticsCSVEmpty(t *testing.T) {
+	// Header only, no data rows
+	csvData := "Date,App Name\n"
+	records, err := ParseAnalyticsCSV(strings.NewReader(csvData))
+	if err != nil {
+		t.Fatalf("ParseAnalyticsCSV() error: %v", err)
+	}
+	if len(records) != 0 {
+		t.Errorf("len = %d, want 0", len(records))
+	}
+}
+
+func TestParseAnalyticsCSVNoData(t *testing.T) {
+	records, err := ParseAnalyticsCSV(strings.NewReader(""))
+	if err != nil {
+		t.Fatalf("ParseAnalyticsCSV() error: %v", err)
+	}
+	if records != nil {
+		t.Errorf("expected nil, got %v", records)
+	}
+}
+
+func TestAnalyticsDataRecordJSON(t *testing.T) {
+	csvData := "Date,Downloads\n2024-01-01,100\n"
+	records, err := ParseAnalyticsCSV(strings.NewReader(csvData))
+	if err != nil {
+		t.Fatalf("ParseAnalyticsCSV() error: %v", err)
+	}
+
+	data, err := json.Marshal(records[0])
+	if err != nil {
+		t.Fatalf("json.Marshal error: %v", err)
+	}
+
+	var m map[string]string
+	if err := json.Unmarshal(data, &m); err != nil {
+		t.Fatalf("json.Unmarshal error: %v", err)
+	}
+
+	if m["Date"] != "2024-01-01" {
+		t.Errorf("Date = %q", m["Date"])
+	}
+	if m["Downloads"] != "100" {
+		t.Errorf("Downloads = %q", m["Downloads"])
+	}
+}
+
+func TestDownloadSegmentCSV(t *testing.T) {
+	csvData := "Date,App Name,Views\n2024-01-01,TestApp,50\n"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/csv")
+		_, _ = w.Write([]byte(csvData))
+	}))
+	defer srv.Close()
+
+	records, err := DownloadSegmentCSV(context.Background(), srv.URL+"/data.csv")
+	if err != nil {
+		t.Fatalf("DownloadSegmentCSV() error: %v", err)
+	}
+
+	if len(records) != 1 {
+		t.Fatalf("len = %d, want 1", len(records))
+	}
+	row := records[0].CSVRow()
+	if row[0] != "2024-01-01" || row[1] != "TestApp" || row[2] != "50" {
+		t.Errorf("row = %v", row)
+	}
+}
+
+func TestDownloadSegmentCSVGzip(t *testing.T) {
+	csvData := "Date,Metric\n2024-03-01,999\n"
+
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	_, _ = gz.Write([]byte(csvData))
+	_ = gz.Close()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Encoding", "gzip")
+		_, _ = w.Write(buf.Bytes())
+	}))
+	defer srv.Close()
+
+	records, err := DownloadSegmentCSV(context.Background(), srv.URL+"/data.csv.gz")
+	if err != nil {
+		t.Fatalf("DownloadSegmentCSV() error: %v", err)
+	}
+
+	if len(records) != 1 {
+		t.Fatalf("len = %d, want 1", len(records))
+	}
+	if records[0].CSVRow()[1] != "999" {
+		t.Errorf("Metric = %q", records[0].CSVRow()[1])
+	}
+}
+
+func TestDownloadSegmentCSVError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	_, err := DownloadSegmentCSV(context.Background(), srv.URL+"/missing.csv")
+	if err == nil {
+		t.Fatal("expected error for 404 response")
+	}
+}
+
+func TestFetchAnalyticsFlowWithSegmentDownload(t *testing.T) {
+	csvData := "Date,Category,Value\n2024-01-01,APP_USAGE,42\n"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/analyticsReportRequests":
+			resp := SingleResponse[AnalyticsReportRequestResource]{
+				Data: AnalyticsReportRequestResource{ID: "req-1", Type: "analyticsReportRequests"},
+			}
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(resp)
+
+		case r.URL.Path == "/v1/analyticsReportRequests/req-1/reports":
+			resp := Response[AnalyticsReportResource]{
+				Data: []AnalyticsReportResource{
+					{ID: "rep-1", Type: "analyticsReports", Attributes: AnalyticsReportAttributes{Category: "APP_USAGE", Name: "Usage"}},
+				},
+			}
+			_ = json.NewEncoder(w).Encode(resp)
+
+		case r.URL.Path == "/v1/analyticsReports/rep-1/segments":
+			resp := Response[AnalyticsSegmentResource]{
+				Data: []AnalyticsSegmentResource{
+					{ID: "seg-1", Type: "analyticsReportSegments", Attributes: AnalyticsSegmentAttributes{
+						URL: "http://" + r.Host + "/download/seg-1.csv",
+					}},
+				},
+			}
+			_ = json.NewEncoder(w).Encode(resp)
+
+		case r.URL.Path == "/download/seg-1.csv":
+			w.Header().Set("Content-Type", "text/csv")
+			_, _ = w.Write([]byte(csvData))
+
+		default:
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintf(w, `{"data":[]}`)
+		}
+	}))
+	defer srv.Close()
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	ctx := context.Background()
+
+	reqID, err := RequestAnalyticsReport(ctx, c, "APP1")
+	if err != nil {
+		t.Fatalf("request error: %v", err)
+	}
+
+	reports, err := GetAnalyticsReports(ctx, c, reqID, "APP_USAGE")
+	if err != nil {
+		t.Fatalf("reports error: %v", err)
+	}
+
+	if len(reports) != 1 {
+		t.Fatalf("reports len = %d, want 1", len(reports))
+	}
+
+	segments, err := GetAnalyticsSegments(ctx, c, reports[0].ID)
+	if err != nil {
+		t.Fatalf("segments error: %v", err)
+	}
+
+	if len(segments) != 1 {
+		t.Fatalf("segments len = %d, want 1", len(segments))
+	}
+
+	records, err := DownloadSegmentCSV(ctx, segments[0].URL)
+	if err != nil {
+		t.Fatalf("download error: %v", err)
+	}
+
+	if len(records) != 1 {
+		t.Fatalf("records len = %d, want 1", len(records))
+	}
+
+	row := records[0].CSVRow()
+	if row[0] != "2024-01-01" || row[1] != "APP_USAGE" || row[2] != "42" {
+		t.Errorf("row = %v", row)
 	}
 }
