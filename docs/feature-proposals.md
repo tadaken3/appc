@@ -206,8 +206,9 @@ appc sales --date 2026-02-20 --output sales-0220.json
 appc sales --from 2026-01-01 --to 2026-01-31 --output sales-jan.csv --format csv
 ```
 
-**理由**: Windows ユーザーやシェルに不慣れなユーザーへの配慮。
-自動命名（`--output auto` → `sales_2026-02-20_daily.json`）も検討。
+**理由**: stdout への出力を基本とし、`--output` はシェルリダイレクト（`> file.json`）の
+薄いラッパーとして位置づける。CLAUDE.md の「データは stdout、ステータスは stderr」方針を維持する。
+`--output auto` の自動命名は予測不可能な副作用を生むため、採用しない。
 
 ---
 
@@ -263,6 +264,11 @@ appc sales --date 2026-02-20 --profile work
 
 **理由**: 受託開発者やチームで複数アカウントを管理する場合に必須。
 
+**セキュリティ上の注意**:
+- `appc profile add` 時に `.p8` ファイルのパーミッションが `0600` でない場合は警告を出す
+- `config.json` には `key_path`（ファイルパス）のみを保持し、秘密鍵の内容は保存しない
+- 将来的には macOS Keychain / Linux libsecret への保存も検討する
+
 ---
 
 ### 4-3. `appc doctor` — 診断コマンド [P1]
@@ -275,7 +281,7 @@ appc doctor
 
 ```
 [OK] Config file: ~/.config/appc/config.json
-[OK] Private key: ~/.keys/AuthKey_XXXXX.p8 (valid ECDSA P-256)
+[OK] Private key: AuthKey_XXXXX.p8 (valid ECDSA P-256)
 [OK] JWT generation: success
 [OK] API connection: authenticated (issuer: XXXXXXXX-...)
 [WARN] golangci-lint: not found (optional, for development)
@@ -283,6 +289,11 @@ appc doctor
 
 **理由**: セットアップ時のトラブルシューティングを大幅に簡略化。
 API 疎通確認まで一発でできるのは初心者に優しい。
+
+**出力に関する注意**:
+- 全出力を `os.Stderr` に向ける（CLAUDE.md の「ステータスは stderr」原則に従う）
+- issuer ID は先頭8文字 + `...` に省略する（例: `XXXXXXXX-...`）
+- 秘密鍵のパスはファイル名のみ表示し、フルパスは出力しない（バグレポート送信時の情報漏洩を防止）
 
 ---
 
@@ -297,6 +308,13 @@ appc sales --date ... --verbose           # リクエスト/レスポンス詳�
 
 **理由**: パイプラインに組み込む際は `--quiet` で余計な出力を抑制。
 デバッグ時は `--verbose` で HTTP リクエストの詳細を確認。
+
+**セキュリティ上の注意**:
+`--verbose` で HTTP リクエスト/レスポンスの詳細を出力する際、
+`Authorization` ヘッダに含まれる JWT Bearer トークンが平文で出力されないようにする。
+- `Authorization` ヘッダは `Bearer [REDACTED]` に置換してから出力する
+- `internal/client` に `redactHeader(name string) bool` ヘルパーを追加してテストで検証する
+- ユーザーが `2>&1 | tee debug.log` でログ保存した場合や CI/CD ログへの漏洩を防止する
 
 ---
 
@@ -351,11 +369,25 @@ appc reviews --app <APP_ID> --sentiment
 
 ```
 appc watch reviews --app <APP_ID> --interval 1h
-appc watch sales --date today --interval 6h
+appc watch sales --date yesterday --interval 6h
 ```
+
+> **注**: Apple の Sales Reports API は日次レポートを当日深夜（Pacific Time）以降に
+> 翌日公開するため、`--date today` は機能しない。常に前日以前のデータを指定する。
 
 **理由**: cron を設定しなくても、ターミナルを開いたまま新着レビューを
 監視できる。Webhook 連携（Slack 通知等）の基盤にもなる。
+
+**実装上の必須要件**:
+- `signal.NotifyContext` で `SIGINT`/`SIGTERM` を受け取りコンテキストをキャンセルする
+- 既存 `client.go` は `context.Context` を受け取る設計のため、ポーリングループもこのコンテキストを引き継ぐ
+- ポーリング間隔は「前回完了からN分後」方式とし、定義を明確にする
+
+```go
+// 推奨パターン
+ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+defer stop()
+```
 
 ---
 
@@ -369,10 +401,16 @@ appc sales --date 2026-01-15          # キャッシュから即座に返す
 appc sales --date 2026-01-15 --fresh  # キャッシュを無視して再取得
 ```
 
-**保存先**: `~/.cache/appc/`
+**保存先**: `${XDG_CACHE_HOME:-~/.cache}/appc/`（XDG Base Directory 準拠）
 
-**理由**: 過去の売上データは不変なので、キャッシュとの相性が良い。
+**理由**: 過去の売上データはレポート確定後は不変なので、キャッシュとの相性が良い。
 日付範囲の一括取得（`--from --to`）で API レート制限に引っかかるリスクも軽減できる。
+
+**キャッシュ設計の注意点**:
+- **データ確定タイミング**: Apple のレポートは公開後 24〜48 時間は未確定の場合がある。未確定期間中のデータには TTL を設定し、自動的に再取得する
+- **キャッシュキー**: エンドポイント・日付・vendor 番号・レポートタイプなど全パラメータをキーに含める（不足するとコリジョン、過剰だとヒットしない）
+- **アトミック書き込み**: クラッシュ時の破損防止のため `os.Rename` による一時ファイル経由で書き込む
+- **`--fresh` フラグ**: キャッシュを無視して再取得するオプション
 
 ---
 
