@@ -102,17 +102,29 @@ appc reviews --app <APP_ID> --format csv > reviews.csv
 
 ### `appc analytics`
 
-App Store のアナリティクスレポートをリクエスト・取得します。
+App Store のアナリティクスレポートをリクエスト・取得します。セグメント CSV をダウンロードしてパースした結果を出力します。
 
 | フラグ | 型 | デフォルト | 説明 |
 |---|---|---|---|
 | `--app` | string | *（必須）* | アプリ ID |
-| `--category` | string | | レポートカテゴリ（例: `APP_USAGE`, `APP_STORE_ENGAGEMENT`） |
+| `--category` | string | | レポートカテゴリ |
+| `--snapshot` | bool | `false` | ONE_TIME_SNAPSHOT で過去データを一括取得 |
+
+利用可能なカテゴリ: `APP_USAGE`, `APP_STORE_ENGAGEMENT`, `COMMERCE`, `FRAMEWORK_USAGE`, `PERFORMANCE`
 
 ```bash
-appc analytics --app <APP_ID>
+# 最新のアナリティクスを取得（ONGOING モード — リクエスト作成日以降のデータ）
 appc analytics --app <APP_ID> --category APP_USAGE
+appc analytics --app <APP_ID> --category APP_STORE_ENGAGEMENT --format csv
+
+# 過去データを一括取得（アプリ作成日〜リクエスト日）
+appc analytics --app <APP_ID> --category APP_USAGE --snapshot
+
+# Claude にパイプして分析
+appc analytics --app <APP_ID> --category APP_USAGE | claude "インストールのトレンドを分析して"
 ```
+
+> **注意:** 初回実行時は Apple 側でレポートインスタンスの生成に時間がかかります（ONGOING は 1〜2 日、スナップショットは数時間）。2 回目以降はすぐにデータが取得できます。
 
 ### `appc configure`
 

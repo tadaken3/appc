@@ -102,17 +102,29 @@ appc reviews --app <APP_ID> --format csv > reviews.csv
 
 ### `appc analytics`
 
-Request and retrieve App Store analytics reports.
+Request and retrieve App Store analytics reports. Downloads segment CSV data and outputs parsed records.
 
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--app` | string | *(required)* | App ID |
-| `--category` | string | | Report category (e.g., `APP_USAGE`, `APP_STORE_ENGAGEMENT`) |
+| `--category` | string | | Report category |
+| `--snapshot` | bool | `false` | Use ONE_TIME_SNAPSHOT to retrieve historical data |
+
+Available categories: `APP_USAGE`, `APP_STORE_ENGAGEMENT`, `COMMERCE`, `FRAMEWORK_USAGE`, `PERFORMANCE`
 
 ```bash
-appc analytics --app <APP_ID>
+# Fetch latest analytics (ONGOING mode — data available from request creation date onward)
 appc analytics --app <APP_ID> --category APP_USAGE
+appc analytics --app <APP_ID> --category APP_STORE_ENGAGEMENT --format csv
+
+# Fetch historical data (from app creation date to request date)
+appc analytics --app <APP_ID> --category APP_USAGE --snapshot
+
+# Pipe to Claude for analysis
+appc analytics --app <APP_ID> --category APP_USAGE | claude "Analyze the install trends"
 ```
+
+> **Note:** The first time you run `analytics`, Apple needs time to generate report instances (typically 1–2 days for ONGOING, several hours for snapshots). Subsequent runs will return data immediately.
 
 ### `appc configure`
 
