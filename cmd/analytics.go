@@ -64,14 +64,28 @@ func runAnalytics(cmd *cobra.Command, args []string) error {
 		return output.Write(os.Stdout, format, reports)
 	}
 
-	// Collect segment CSV data from all reports
+	// Collect segment CSV data: reports → instances → segments → CSV download
 	var allRecords []api.AnalyticsSegmentRecord
 	for _, report := range reports {
-		fmt.Fprintf(os.Stderr, "Fetching segments for report %q (%s)...\n", report.Name, report.Category)
+		fmt.Fprintf(os.Stderr, "Fetching instances for report %q (%s)...\n", report.Name, report.Category)
 
-		segments, err := api.GetAnalyticsSegments(ctx, c, report.ID)
+		instances, err := api.GetAnalyticsInstances(ctx, c, report.ID)
 		if err != nil {
-			return fmt.Errorf("getting segments for report %s: %w", report.ID, err)
+			return fmt.Errorf("getting instances for report %s: %w", report.ID, err)
+		}
+
+		if len(instances) == 0 {
+			fmt.Fprintf(os.Stderr, "  No instances found, skipping.\n")
+			continue
+		}
+
+		// Use the latest instance (most recent processing date)
+		latest := instances[len(instances)-1]
+		fmt.Fprintf(os.Stderr, "Using instance %s (date: %s)...\n", latest.ID, latest.ProcessingDate)
+
+		segments, err := api.GetAnalyticsSegments(ctx, c, latest.ID)
+		if err != nil {
+			return fmt.Errorf("getting segments for instance %s: %w", latest.ID, err)
 		}
 
 		for _, seg := range segments {

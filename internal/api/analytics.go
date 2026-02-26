@@ -39,6 +39,33 @@ type AnalyticsReportAttributes struct {
 	Name     string `json:"name"`
 }
 
+// Instance types
+type AnalyticsInstanceResource struct {
+	Type       string                        `json:"type"`
+	ID         string                        `json:"id"`
+	Attributes AnalyticsInstanceAttributes   `json:"attributes"`
+}
+
+type AnalyticsInstanceAttributes struct {
+	Granularity    string `json:"granularity"`
+	ProcessingDate string `json:"processingDate"`
+}
+
+// Output type for instances
+type AnalyticsInstance struct {
+	ID             string `json:"id"`
+	Granularity    string `json:"granularity"`
+	ProcessingDate string `json:"processing_date"`
+}
+
+func (i AnalyticsInstance) CSVHeaders() []string {
+	return []string{"id", "granularity", "processing_date"}
+}
+
+func (i AnalyticsInstance) CSVRow() []string {
+	return []string{i.ID, i.Granularity, i.ProcessingDate}
+}
+
 // Segment types
 type AnalyticsSegmentResource struct {
 	Type       string                       `json:"type"`
@@ -118,14 +145,38 @@ func DownloadAnalyticsSegmentCSV(ctx context.Context, segmentURL string) ([]Anal
 		return nil, fmt.Errorf("segment download error %d", resp.StatusCode)
 	}
 
-	var reader io.Reader = resp.Body
-	if resp.Header.Get("Content-Encoding") == "gzip" {
+	var reader io.Reader
+
+	// Apple's segment URLs often return gzip-compressed data.
+	// Check Content-Encoding header first, then try to detect gzip magic bytes.
+	contentEncoding := resp.Header.Get("Content-Encoding")
+	contentType := resp.Header.Get("Content-Type")
+	if contentEncoding == "gzip" || contentType == "application/gzip" || contentType == "application/x-gzip" {
 		gz, err := gzip.NewReader(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("decompressing segment CSV: %w", err)
 		}
 		defer func() { _ = gz.Close() }()
 		reader = gz
+	} else {
+		// Try gzip decompression by reading initial bytes
+		buf := make([]byte, 2)
+		n, err := io.ReadFull(resp.Body, buf)
+		if err != nil && n == 0 {
+			return nil, nil
+		}
+		combined := io.MultiReader(bytes.NewReader(buf[:n]), resp.Body)
+		// gzip magic number: 0x1f 0x8b
+		if n == 2 && buf[0] == 0x1f && buf[1] == 0x8b {
+			gz, err := gzip.NewReader(combined)
+			if err != nil {
+				return nil, fmt.Errorf("decompressing segment CSV: %w", err)
+			}
+			defer func() { _ = gz.Close() }()
+			reader = gz
+		} else {
+			reader = combined
+		}
 	}
 
 	return parseAnalyticsCSV(reader)
@@ -133,6 +184,7 @@ func DownloadAnalyticsSegmentCSV(ctx context.Context, segmentURL string) ([]Anal
 
 func parseAnalyticsCSV(r io.Reader) ([]AnalyticsSegmentRecord, error) {
 	cr := csv.NewReader(r)
+	cr.Comma = '\t'
 	cr.LazyQuotes = true
 	cr.FieldsPerRecord = -1
 
@@ -200,6 +252,11 @@ func RequestAnalyticsReport(ctx context.Context, c *client.Client, appID string)
 		return "", fmt.Errorf("reading response: %w", err)
 	}
 
+	// 409 Conflict means an ONGOING request already exists; retrieve it
+	if resp.StatusCode == http.StatusConflict {
+		return getExistingReportRequestID(ctx, c, appID)
+	}
+
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("analytics request API error %d: %s", resp.StatusCode, string(respBody))
 	}
@@ -210,6 +267,31 @@ func RequestAnalyticsReport(ctx context.Context, c *client.Client, appID string)
 	}
 
 	return result.Data.ID, nil
+}
+
+func getExistingReportRequestID(ctx context.Context, c *client.Client, appID string) (string, error) {
+	path := fmt.Sprintf("/v1/apps/%s/analyticsReportRequests?filter[accessType]=ONGOING", appID)
+
+	resp, err := c.Get(ctx, path)
+	if err != nil {
+		return "", fmt.Errorf("getting existing report requests: %w", err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if err != nil {
+		return "", fmt.Errorf("reading response: %w", err)
+	}
+
+	var result Response[AnalyticsReportRequestResource]
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("parsing response: %w", err)
+	}
+
+	if len(result.Data) == 0 {
+		return "", fmt.Errorf("no existing ONGOING analytics report request found")
+	}
+
+	return result.Data[0].ID, nil
 }
 
 func GetAnalyticsReports(ctx context.Context, c *client.Client, requestID, category string) ([]AnalyticsReport, error) {
@@ -254,8 +336,42 @@ func GetAnalyticsReports(ctx context.Context, c *client.Client, requestID, categ
 	return reports, nil
 }
 
-func GetAnalyticsSegments(ctx context.Context, c *client.Client, reportID string) ([]AnalyticsSegment, error) {
-	path := fmt.Sprintf("/v1/analyticsReports/%s/segments", reportID)
+func GetAnalyticsInstances(ctx context.Context, c *client.Client, reportID string) ([]AnalyticsInstance, error) {
+	path := fmt.Sprintf("/v1/analyticsReports/%s/instances", reportID)
+
+	var instances []AnalyticsInstance
+	for path != "" {
+		resp, err := c.Get(ctx, path)
+		if err != nil {
+			return nil, fmt.Errorf("getting analytics instances: %w", err)
+		}
+		body, err := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("reading response: %w", err)
+		}
+
+		var result Response[AnalyticsInstanceResource]
+		if err := json.Unmarshal(body, &result); err != nil {
+			return nil, fmt.Errorf("parsing response: %w", err)
+		}
+
+		for _, inst := range result.Data {
+			instances = append(instances, AnalyticsInstance{
+				ID:             inst.ID,
+				Granularity:    inst.Attributes.Granularity,
+				ProcessingDate: inst.Attributes.ProcessingDate,
+			})
+		}
+
+		path = nextPath(result.Links.Next, c.BaseURL)
+	}
+
+	return instances, nil
+}
+
+func GetAnalyticsSegments(ctx context.Context, c *client.Client, instanceID string) ([]AnalyticsSegment, error) {
+	path := fmt.Sprintf("/v1/analyticsReportInstances/%s/segments", instanceID)
 
 	var segments []AnalyticsSegment
 	for path != "" {

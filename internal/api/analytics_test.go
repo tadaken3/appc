@@ -71,6 +71,43 @@ func TestRequestAnalyticsReport(t *testing.T) {
 	}
 }
 
+func TestRequestAnalyticsReportConflict(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/analyticsReportRequests":
+			w.WriteHeader(http.StatusConflict)
+			_, _ = fmt.Fprint(w, `{"errors":[{"status":"409","detail":"You already have such an entity"}]}`)
+
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/apps/APP123/analyticsReportRequests":
+			if r.URL.Query().Get("filter[accessType]") != "ONGOING" {
+				t.Errorf("filter[accessType] = %q, want ONGOING", r.URL.Query().Get("filter[accessType]"))
+			}
+			resp := Response[AnalyticsReportRequestResource]{
+				Data: []AnalyticsReportRequestResource{
+					{Type: "analyticsReportRequests", ID: "existing-req-001", Attributes: AnalyticsReportRequestAttributes{AccessType: "ONGOING"}},
+				},
+			}
+			_ = json.NewEncoder(w).Encode(resp)
+
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	reqID, err := RequestAnalyticsReport(context.Background(), c, "APP123")
+	if err != nil {
+		t.Fatalf("RequestAnalyticsReport() error: %v", err)
+	}
+	if reqID != "existing-req-001" {
+		t.Errorf("reqID = %q, want existing-req-001", reqID)
+	}
+}
+
 func TestGetAnalyticsReports(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		expectedPath := "/v1/analyticsReportRequests/req-001/reports"
@@ -277,8 +314,130 @@ func TestGetAnalyticsReportsPagination(t *testing.T) {
 	}
 }
 
+func TestGetAnalyticsInstances(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		expectedPath := "/v1/analyticsReports/report-1/instances"
+		if r.URL.Path != expectedPath {
+			t.Errorf("path = %q, want %q", r.URL.Path, expectedPath)
+		}
+
+		resp := Response[AnalyticsInstanceResource]{
+			Data: []AnalyticsInstanceResource{
+				{
+					Type: "analyticsReportInstances",
+					ID:   "inst-1",
+					Attributes: AnalyticsInstanceAttributes{
+						Granularity:    "DAILY",
+						ProcessingDate: "2026-02-20",
+					},
+				},
+				{
+					Type: "analyticsReportInstances",
+					ID:   "inst-2",
+					Attributes: AnalyticsInstanceAttributes{
+						Granularity:    "DAILY",
+						ProcessingDate: "2026-02-21",
+					},
+				},
+			},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	instances, err := GetAnalyticsInstances(context.Background(), c, "report-1")
+	if err != nil {
+		t.Fatalf("GetAnalyticsInstances() error: %v", err)
+	}
+	if len(instances) != 2 {
+		t.Fatalf("len = %d, want 2", len(instances))
+	}
+	if instances[0].ProcessingDate != "2026-02-20" {
+		t.Errorf("ProcessingDate = %q, want 2026-02-20", instances[0].ProcessingDate)
+	}
+}
+
+func TestGetAnalyticsInstancesPagination(t *testing.T) {
+	page := 0
+	var srvURL string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		page++
+		var resp Response[AnalyticsInstanceResource]
+		if page == 1 {
+			resp = Response[AnalyticsInstanceResource]{
+				Data: []AnalyticsInstanceResource{
+					{ID: "inst-1", Type: "analyticsReportInstances", Attributes: AnalyticsInstanceAttributes{ProcessingDate: "2026-02-20"}},
+				},
+				Links: PagingLinks{Next: srvURL + "/v1/analyticsReports/report-1/instances?cursor=2"},
+			}
+		} else {
+			resp = Response[AnalyticsInstanceResource]{
+				Data: []AnalyticsInstanceResource{
+					{ID: "inst-2", Type: "analyticsReportInstances", Attributes: AnalyticsInstanceAttributes{ProcessingDate: "2026-02-21"}},
+				},
+			}
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+	srvURL = srv.URL
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	instances, err := GetAnalyticsInstances(context.Background(), c, "report-1")
+	if err != nil {
+		t.Fatalf("GetAnalyticsInstances() error: %v", err)
+	}
+	if len(instances) != 2 {
+		t.Fatalf("len = %d, want 2", len(instances))
+	}
+}
+
+func TestGetAnalyticsSegmentsFromInstance(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		expectedPath := "/v1/analyticsReportInstances/inst-1/segments"
+		if r.URL.Path != expectedPath {
+			t.Errorf("path = %q, want %q", r.URL.Path, expectedPath)
+		}
+
+		resp := Response[AnalyticsSegmentResource]{
+			Data: []AnalyticsSegmentResource{
+				{
+					Type: "analyticsReportSegments",
+					ID:   "seg-1",
+					Attributes: AnalyticsSegmentAttributes{
+						URL:         "https://example.com/data.csv",
+						CheckSum:    "abc123",
+						SizeInBytes: 1024,
+					},
+				},
+			},
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	segments, err := GetAnalyticsSegments(context.Background(), c, "inst-1")
+	if err != nil {
+		t.Fatalf("GetAnalyticsSegments() error: %v", err)
+	}
+	if len(segments) != 1 {
+		t.Fatalf("len = %d, want 1", len(segments))
+	}
+	if segments[0].URL != "https://example.com/data.csv" {
+		t.Errorf("URL = %q", segments[0].URL)
+	}
+}
+
 func TestDownloadAnalyticsSegmentCSV(t *testing.T) {
-	csvData := "Date,App Name,Downloads\n2026-02-20,MyApp,42\n2026-02-21,MyApp,55\n"
+	csvData := "Date\tApp Name\tDownloads\n2026-02-20\tMyApp\t42\n2026-02-21\tMyApp\t55\n"
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/csv")
@@ -305,7 +464,7 @@ func TestDownloadAnalyticsSegmentCSV(t *testing.T) {
 }
 
 func TestDownloadAnalyticsSegmentCSVGzip(t *testing.T) {
-	csvData := "Date,Downloads\n2026-02-20,42\n"
+	csvData := "Date\tDownloads\n2026-02-20\t42\n"
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Encoding", "gzip")
@@ -329,7 +488,7 @@ func TestDownloadAnalyticsSegmentCSVGzip(t *testing.T) {
 
 func TestDownloadAnalyticsSegmentCSVEmpty(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = fmt.Fprint(w, "Date,Downloads\n")
+		_, _ = fmt.Fprint(w, "Date\tDownloads\n")
 	}))
 	defer srv.Close()
 
@@ -387,7 +546,7 @@ func TestGetAnalyticsSegmentsPagination(t *testing.T) {
 				Data: []AnalyticsSegmentResource{
 					{ID: "s1", Type: "analyticsReportSegments", Attributes: AnalyticsSegmentAttributes{URL: "https://example.com/1.csv"}},
 				},
-				Links: PagingLinks{Next: srvURL + "/v1/analyticsReports/rep-1/segments?cursor=2"},
+				Links: PagingLinks{Next: srvURL + "/v1/analyticsReportInstances/inst-1/segments?cursor=2"},
 			}
 		} else {
 			resp = Response[AnalyticsSegmentResource]{
