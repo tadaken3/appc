@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/kenta-tanaka/appc/internal/client"
 )
@@ -106,7 +107,8 @@ func DownloadAnalyticsSegmentCSV(ctx context.Context, segmentURL string) ([]Anal
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	httpClient := &http.Client{Timeout: 60 * time.Second}
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("downloading segment CSV: %w", err)
 	}
