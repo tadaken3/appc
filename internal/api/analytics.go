@@ -2,12 +2,15 @@ package api
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/kenta-tanaka/appc/internal/client"
 )
@@ -76,6 +79,89 @@ func (s AnalyticsSegment) CSVHeaders() []string {
 
 func (s AnalyticsSegment) CSVRow() []string {
 	return []string{s.ID, s.URL, s.CheckSum, fmt.Sprintf("%d", s.SizeInBytes)}
+}
+
+// AnalyticsSegmentRecord represents a row from a downloaded analytics segment CSV.
+// Headers are dynamic (vary by report category), so we use a map.
+type AnalyticsSegmentRecord struct {
+	Headers []string          `json:"-"`
+	Fields  map[string]string `json:"fields"`
+}
+
+func (r AnalyticsSegmentRecord) CSVHeaders() []string {
+	return r.Headers
+}
+
+func (r AnalyticsSegmentRecord) CSVRow() []string {
+	row := make([]string, len(r.Headers))
+	for i, h := range r.Headers {
+		row[i] = r.Fields[h]
+	}
+	return row
+}
+
+func DownloadAnalyticsSegmentCSV(ctx context.Context, segmentURL string) ([]AnalyticsSegmentRecord, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, segmentURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("downloading segment CSV: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("segment download error %d", resp.StatusCode)
+	}
+
+	var reader io.Reader = resp.Body
+	if resp.Header.Get("Content-Encoding") == "gzip" {
+		gz, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("decompressing segment CSV: %w", err)
+		}
+		defer func() { _ = gz.Close() }()
+		reader = gz
+	}
+
+	return parseAnalyticsCSV(reader)
+}
+
+func parseAnalyticsCSV(r io.Reader) ([]AnalyticsSegmentRecord, error) {
+	cr := csv.NewReader(r)
+	cr.LazyQuotes = true
+	cr.FieldsPerRecord = -1
+
+	lines, err := cr.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("reading CSV: %w", err)
+	}
+
+	if len(lines) < 2 {
+		return nil, nil
+	}
+
+	headers := lines[0]
+	var records []AnalyticsSegmentRecord
+	for _, fields := range lines[1:] {
+		if len(fields) == 0 || (len(fields) == 1 && strings.TrimSpace(fields[0]) == "") {
+			continue
+		}
+		m := make(map[string]string, len(headers))
+		for i, h := range headers {
+			if i < len(fields) {
+				m[h] = fields[i]
+			}
+		}
+		records = append(records, AnalyticsSegmentRecord{
+			Headers: headers,
+			Fields:  m,
+		})
+	}
+
+	return records, nil
 }
 
 func RequestAnalyticsReport(ctx context.Context, c *client.Client, appID string) (string, error) {

@@ -1,11 +1,13 @@
 package api
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -272,6 +274,105 @@ func TestGetAnalyticsReportsPagination(t *testing.T) {
 	}
 	if reports[0].Name != "Page1" || reports[1].Name != "Page2" {
 		t.Errorf("reports = %v", reports)
+	}
+}
+
+func TestDownloadAnalyticsSegmentCSV(t *testing.T) {
+	csvData := "Date,App Name,Downloads\n2026-02-20,MyApp,42\n2026-02-21,MyApp,55\n"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/csv")
+		_, _ = fmt.Fprint(w, csvData)
+	}))
+	defer srv.Close()
+
+	records, err := DownloadAnalyticsSegmentCSV(context.Background(), srv.URL)
+	if err != nil {
+		t.Fatalf("DownloadAnalyticsSegmentCSV() error: %v", err)
+	}
+	if len(records) != 2 {
+		t.Fatalf("len = %d, want 2", len(records))
+	}
+	if records[0].Fields["Date"] != "2026-02-20" {
+		t.Errorf("Date = %q, want 2026-02-20", records[0].Fields["Date"])
+	}
+	if records[0].Fields["Downloads"] != "42" {
+		t.Errorf("Downloads = %q, want 42", records[0].Fields["Downloads"])
+	}
+	if records[1].Fields["App Name"] != "MyApp" {
+		t.Errorf("App Name = %q, want MyApp", records[1].Fields["App Name"])
+	}
+}
+
+func TestDownloadAnalyticsSegmentCSVGzip(t *testing.T) {
+	csvData := "Date,Downloads\n2026-02-20,42\n"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Encoding", "gzip")
+		gz := gzip.NewWriter(w)
+		_, _ = fmt.Fprint(gz, csvData)
+		_ = gz.Close()
+	}))
+	defer srv.Close()
+
+	records, err := DownloadAnalyticsSegmentCSV(context.Background(), srv.URL)
+	if err != nil {
+		t.Fatalf("DownloadAnalyticsSegmentCSV() error: %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("len = %d, want 1", len(records))
+	}
+	if records[0].Fields["Date"] != "2026-02-20" {
+		t.Errorf("Date = %q", records[0].Fields["Date"])
+	}
+}
+
+func TestDownloadAnalyticsSegmentCSVEmpty(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = fmt.Fprint(w, "Date,Downloads\n")
+	}))
+	defer srv.Close()
+
+	records, err := DownloadAnalyticsSegmentCSV(context.Background(), srv.URL)
+	if err != nil {
+		t.Fatalf("DownloadAnalyticsSegmentCSV() error: %v", err)
+	}
+	if len(records) != 0 {
+		t.Fatalf("len = %d, want 0", len(records))
+	}
+}
+
+func TestDownloadAnalyticsSegmentCSVHTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	_, err := DownloadAnalyticsSegmentCSV(context.Background(), srv.URL)
+	if err == nil {
+		t.Fatal("expected error for HTTP 404")
+	}
+	if !strings.Contains(err.Error(), "404") {
+		t.Errorf("error = %q, want to contain 404", err.Error())
+	}
+}
+
+func TestAnalyticsSegmentRecordCSVOutput(t *testing.T) {
+	headers := []string{"Date", "App Name", "Downloads"}
+	r := AnalyticsSegmentRecord{
+		Headers: headers,
+		Fields:  map[string]string{"Date": "2026-02-20", "App Name": "MyApp", "Downloads": "42"},
+	}
+	csvHeaders := r.CSVHeaders()
+	if len(csvHeaders) != 3 {
+		t.Fatalf("CSVHeaders len = %d, want 3", len(csvHeaders))
+	}
+	row := r.CSVRow()
+	if len(row) != 3 {
+		t.Fatalf("CSVRow len = %d, want 3", len(row))
+	}
+	if row[0] != "2026-02-20" {
+		t.Errorf("row[0] = %q, want 2026-02-20", row[0])
 	}
 }
 
