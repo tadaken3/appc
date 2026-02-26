@@ -71,6 +71,81 @@ func TestRequestAnalyticsReport(t *testing.T) {
 	}
 }
 
+func TestRequestAnalyticsReportSnapshot(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var reqBody struct {
+			Data struct {
+				Attributes struct {
+					AccessType string `json:"accessType"`
+				} `json:"attributes"`
+			} `json:"data"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&reqBody)
+
+		if reqBody.Data.Attributes.AccessType != "ONE_TIME_SNAPSHOT" {
+			t.Errorf("accessType = %q, want ONE_TIME_SNAPSHOT", reqBody.Data.Attributes.AccessType)
+		}
+
+		resp := SingleResponse[AnalyticsReportRequestResource]{
+			Data: AnalyticsReportRequestResource{
+				Type: "analyticsReportRequests",
+				ID:   "snap-001",
+				Attributes: AnalyticsReportRequestAttributes{
+					AccessType: "ONE_TIME_SNAPSHOT",
+				},
+			},
+		}
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	reqID, err := RequestAnalyticsReportWithAccessType(context.Background(), c, "APP123", "ONE_TIME_SNAPSHOT")
+	if err != nil {
+		t.Fatalf("RequestAnalyticsReportWithAccessType() error: %v", err)
+	}
+	if reqID != "snap-001" {
+		t.Errorf("reqID = %q, want snap-001", reqID)
+	}
+}
+
+func TestRequestAnalyticsReportSnapshotConflictFallback(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost:
+			w.WriteHeader(http.StatusConflict)
+			_, _ = fmt.Fprint(w, `{"errors":[{"status":"409"}]}`)
+
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/apps/APP123/analyticsReportRequests":
+			accessType := r.URL.Query().Get("filter[accessType]")
+			if accessType != "ONE_TIME_SNAPSHOT" {
+				t.Errorf("filter[accessType] = %q, want ONE_TIME_SNAPSHOT", accessType)
+			}
+			resp := Response[AnalyticsReportRequestResource]{
+				Data: []AnalyticsReportRequestResource{
+					{Type: "analyticsReportRequests", ID: "existing-snap-001"},
+				},
+			}
+			_ = json.NewEncoder(w).Encode(resp)
+		}
+	}))
+	defer srv.Close()
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	reqID, err := RequestAnalyticsReportWithAccessType(context.Background(), c, "APP123", "ONE_TIME_SNAPSHOT")
+	if err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	if reqID != "existing-snap-001" {
+		t.Errorf("reqID = %q, want existing-snap-001", reqID)
+	}
+}
+
 func TestRequestAnalyticsReportConflict(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {

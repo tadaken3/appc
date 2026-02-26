@@ -13,6 +13,7 @@ import (
 var (
 	analyticsAppID    string
 	analyticsCategory string
+	analyticsSnapshot bool
 )
 
 var analyticsCmd = &cobra.Command{
@@ -27,7 +28,10 @@ Available categories:
   APP_STORE_ENGAGEMENT   App Store engagement (impressions, page views, etc.)
   COMMERCE               Commerce data (sales, in-app purchases, etc.)
   FRAMEWORK_USAGE        Framework usage data
-  PERFORMANCE            App performance metrics (crashes, disk writes, etc.)`,
+  PERFORMANCE            App performance metrics (crashes, disk writes, etc.)
+
+Use --snapshot to retrieve historical data (from app creation to request date).
+Without --snapshot, only data from the ONGOING request creation date onward is available.`,
 	RunE: runAnalytics,
 }
 
@@ -35,6 +39,8 @@ func init() {
 	analyticsCmd.Flags().StringVar(&analyticsAppID, "app", "", "App ID (required)")
 	analyticsCmd.Flags().StringVar(&analyticsCategory, "category", "",
 		"Report category (APP_USAGE, APP_STORE_ENGAGEMENT, COMMERCE, FRAMEWORK_USAGE, PERFORMANCE)")
+	analyticsCmd.Flags().BoolVar(&analyticsSnapshot, "snapshot", false,
+		"Use ONE_TIME_SNAPSHOT to retrieve historical data from app creation date")
 	_ = analyticsCmd.MarkFlagRequired("app")
 	rootCmd.AddCommand(analyticsCmd)
 }
@@ -47,8 +53,13 @@ func runAnalytics(cmd *cobra.Command, args []string) error {
 
 	ctx := context.Background()
 
-	fmt.Fprintln(os.Stderr, "Requesting analytics report...")
-	reqID, err := api.RequestAnalyticsReport(ctx, c, analyticsAppID)
+	accessType := "ONGOING"
+	if analyticsSnapshot {
+		accessType = "ONE_TIME_SNAPSHOT"
+	}
+
+	fmt.Fprintf(os.Stderr, "Requesting analytics report (%s)...\n", accessType)
+	reqID, err := api.RequestAnalyticsReportWithAccessType(ctx, c, analyticsAppID, accessType)
 	if err != nil {
 		return err
 	}

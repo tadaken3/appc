@@ -219,11 +219,15 @@ func parseAnalyticsCSV(r io.Reader) ([]AnalyticsSegmentRecord, error) {
 }
 
 func RequestAnalyticsReport(ctx context.Context, c *client.Client, appID string) (string, error) {
+	return RequestAnalyticsReportWithAccessType(ctx, c, appID, "ONGOING")
+}
+
+func RequestAnalyticsReportWithAccessType(ctx context.Context, c *client.Client, appID, accessType string) (string, error) {
 	reqBody := map[string]any{
 		"data": map[string]any{
 			"type": "analyticsReportRequests",
 			"attributes": map[string]any{
-				"accessType": "ONGOING",
+				"accessType": accessType,
 			},
 			"relationships": map[string]any{
 				"app": map[string]any{
@@ -252,9 +256,9 @@ func RequestAnalyticsReport(ctx context.Context, c *client.Client, appID string)
 		return "", fmt.Errorf("reading response: %w", err)
 	}
 
-	// 409 Conflict means an ONGOING request already exists; retrieve it
+	// 409 Conflict means a request of this type already exists; retrieve it
 	if resp.StatusCode == http.StatusConflict {
-		return getExistingReportRequestID(ctx, c, appID)
+		return getExistingReportRequestID(ctx, c, appID, accessType)
 	}
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
@@ -269,8 +273,8 @@ func RequestAnalyticsReport(ctx context.Context, c *client.Client, appID string)
 	return result.Data.ID, nil
 }
 
-func getExistingReportRequestID(ctx context.Context, c *client.Client, appID string) (string, error) {
-	path := fmt.Sprintf("/v1/apps/%s/analyticsReportRequests?filter[accessType]=ONGOING", appID)
+func getExistingReportRequestID(ctx context.Context, c *client.Client, appID, accessType string) (string, error) {
+	path := fmt.Sprintf("/v1/apps/%s/analyticsReportRequests?filter[accessType]=%s", appID, accessType)
 
 	resp, err := c.Get(ctx, path)
 	if err != nil {
