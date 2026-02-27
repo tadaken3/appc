@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/kenta-tanaka/appc/internal/api"
 	"github.com/kenta-tanaka/appc/internal/output"
@@ -90,7 +91,10 @@ func runAnalytics(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		// Use the latest instance (most recent processing date)
+		// Sort by processing date and use the latest instance
+		sort.Slice(instances, func(i, j int) bool {
+			return instances[i].ProcessingDate < instances[j].ProcessingDate
+		})
 		latest := instances[len(instances)-1]
 		fmt.Fprintf(os.Stderr, "Using instance %s (date: %s)...\n", latest.ID, latest.ProcessingDate)
 

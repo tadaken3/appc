@@ -68,7 +68,7 @@ func LookupAppRating(ctx context.Context, appID, country string) (AppRating, err
 		return AppRating{}, fmt.Errorf("parsing lookup response: %w", err)
 	}
 
-	if result.ResultCount == 0 {
+	if len(result.Results) == 0 {
 		return AppRating{}, nil
 	}
 
