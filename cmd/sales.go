@@ -74,6 +74,10 @@ func runSales(cmd *cobra.Command, args []string) error {
 				_, _ = fmt.Fprintf(os.Stderr, "warning: %s: %v\n", date, err)
 				continue
 			}
+			if len(records) == 0 {
+				_, _ = fmt.Fprintf(os.Stderr, "no sales data for %s\n", date)
+				continue
+			}
 			all = append(all, records...)
 		}
 		return output.Write(os.Stdout, format, all)
@@ -94,6 +98,10 @@ func runSales(cmd *cobra.Command, args []string) error {
 	records, err := api.GetSalesReport(cmd.Context(), c, params)
 	if err != nil {
 		return err
+	}
+
+	if len(records) == 0 {
+		_, _ = fmt.Fprintf(os.Stderr, "no sales data for %s\n", salesReportDate)
 	}
 
 	return output.Write(os.Stdout, format, records)
