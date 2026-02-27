@@ -125,3 +125,28 @@ func TestListAppsEmpty(t *testing.T) {
 		t.Errorf("len = %d, want 0", len(apps))
 	}
 }
+
+func TestAppCSVOutput(t *testing.T) {
+	a := App{
+		ID:          "123",
+		Name:        "My App",
+		BundleID:    "com.example.app",
+		SKU:         "SKU001",
+		Rating:      4.81,
+		RatingCount: 27,
+	}
+	headers := a.CSVHeaders()
+	row := a.CSVRow()
+	if len(headers) != 6 {
+		t.Errorf("headers len = %d, want 6", len(headers))
+	}
+	if len(row) != len(headers) {
+		t.Errorf("row len = %d, headers len = %d", len(row), len(headers))
+	}
+	if row[4] != "4.81" {
+		t.Errorf("row[4] (rating) = %q, want 4.81", row[4])
+	}
+	if row[5] != "27" {
+		t.Errorf("row[5] (rating_count) = %q, want 27", row[5])
+	}
+}

@@ -23,18 +23,20 @@ type AppAttributes struct {
 }
 
 type App struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	BundleID string `json:"bundle_id"`
-	SKU      string `json:"sku"`
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	BundleID    string  `json:"bundle_id"`
+	SKU         string  `json:"sku"`
+	Rating      float64 `json:"rating"`
+	RatingCount int     `json:"rating_count"`
 }
 
 func (a App) CSVHeaders() []string {
-	return []string{"id", "name", "bundle_id", "sku"}
+	return []string{"id", "name", "bundle_id", "sku", "rating", "rating_count"}
 }
 
 func (a App) CSVRow() []string {
-	return []string{a.ID, a.Name, a.BundleID, a.SKU}
+	return []string{a.ID, a.Name, a.BundleID, a.SKU, fmt.Sprintf("%.2f", a.Rating), intToStr(a.RatingCount)}
 }
 
 func ListApps(ctx context.Context, c *client.Client) ([]App, error) {

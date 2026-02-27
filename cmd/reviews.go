@@ -11,10 +11,11 @@ import (
 )
 
 var (
-	reviewsAppID  string
-	reviewsRating int
-	reviewsLimit  int
+	reviewsAppID   string
+	reviewsRating  int
+	reviewsLimit   int
 	reviewsSummary bool
+	reviewsCountry string
 )
 
 var reviewsCmd = &cobra.Command{
@@ -29,6 +30,7 @@ func init() {
 	reviewsCmd.Flags().IntVar(&reviewsRating, "rating", 0, "Filter by rating (1-5)")
 	reviewsCmd.Flags().IntVar(&reviewsLimit, "limit", 100, "Maximum number of reviews")
 	reviewsCmd.Flags().BoolVar(&reviewsSummary, "summary", false, "Show rating summary instead of full reviews")
+	reviewsCmd.Flags().StringVar(&reviewsCountry, "country", "jp", "Country code for rating lookup (used with --summary)")
 	_ = reviewsCmd.MarkFlagRequired("app")
 	rootCmd.AddCommand(reviewsCmd)
 }
@@ -52,6 +54,13 @@ func runReviews(cmd *cobra.Command, args []string) error {
 
 	if reviewsSummary {
 		summary := api.SummarizeReviews(reviews)
+		rating, err := api.LookupAppRating(context.Background(), reviewsAppID, reviewsCountry)
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "warning: rating lookup: %v\n", err)
+		} else {
+			summary.AppRating = rating.Rating
+			summary.AppRatingCount = rating.RatingCount
+		}
 		return output.Write(os.Stdout, format, []api.ReviewSummary{summary})
 	}
 

@@ -59,44 +59,72 @@ Configuration is saved to `~/.config/appc/config.json` with `0600` permissions.
 
 ### `appc apps`
 
-List all apps in your App Store Connect account.
+List all apps in your App Store Connect account. Automatically enriches each app with its App Store rating via the iTunes Lookup API.
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--country` | string | `jp` | Country code for rating lookup |
 
 ```bash
 appc apps
-appc apps --format csv
+appc apps --country us --format csv
+```
+
+### `appc lookup`
+
+Look up app ratings and metadata from the iTunes Lookup API. Supports multiple App IDs for competitor research — no App Store Connect credentials required.
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--app` | string | *(required)* | App ID(s), comma-separated |
+| `--country` | string | `jp` | Country code for store lookup |
+
+```bash
+appc lookup --app 6745560143 --country jp
+appc lookup --app 6745560143,123456789 --country us    # competitor research
+appc lookup --app 6745560143 --format csv
 ```
 
 ### `appc sales`
 
-Download sales and trends reports.
+Download sales and trends reports. Dates with no data (HTTP 404) are treated as empty results instead of errors.
 
 | Flag | Type | Default | Description |
 |---|---|---|---|
-| `--date` | string | *(required)* | Report date (`YYYY-MM-DD` or `YYYY-MM`) |
+| `--date` | string | *(required)** | Report date (`YYYY-MM-DD` or `YYYY-MM`) |
+| `--from` | string | | Start date for range (`YYYY-MM-DD`, requires `--to`, daily only) |
+| `--to` | string | | End date for range (`YYYY-MM-DD`, requires `--from`, daily only) |
 | `--type` | string | `SALES` | Report type: `SALES`, `PRE_ORDER`, `NEWSSTAND` |
 | `--frequency` | string | `DAILY` | Frequency: `DAILY`, `WEEKLY`, `MONTHLY`, `YEARLY` |
 | `--sub-type` | string | `SUMMARY` | Sub type: `SUMMARY`, `DETAILED`, `OPT_IN` |
 | `--vendor` | string | *(from config)* | Vendor number (overrides config value) |
 
+*\* Either `--date` or `--from`/`--to` is required.*
+
 ```bash
 appc sales --date 2025-01-15
 appc sales --date 2025-01-15 --type SALES --frequency DAILY --format csv
 appc sales --date 2025-01 --frequency MONTHLY --vendor 12345678
+appc sales --from 2025-01-01 --to 2025-01-31
 ```
 
 ### `appc reviews`
 
-Retrieve customer reviews for an app.
+Retrieve customer reviews for an app. With `--summary`, shows a rating breakdown enriched with the overall App Store rating from iTunes.
 
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--app` | string | *(required)* | App ID |
 | `--rating` | int | `0` | Filter by star rating (1–5; 0 = all) |
 | `--limit` | int | `100` | Maximum number of reviews to return |
+| `--summary` | bool | `false` | Show rating summary instead of full reviews |
+| `--country` | string | `jp` | Country code for rating lookup (used with `--summary`) |
 
 ```bash
 appc reviews --app <APP_ID>
 appc reviews --app <APP_ID> --rating 5 --limit 50
+appc reviews --app <APP_ID> --summary                    # includes App Store overall rating
+appc reviews --app <APP_ID> --summary --country us
 appc reviews --app <APP_ID> --format csv > reviews.csv
 ```
 
@@ -165,6 +193,7 @@ appc/
 │   ├── sales.go            #   appc sales
 │   ├── reviews.go          #   appc reviews
 │   ├── analytics.go        #   appc analytics
+│   ├── lookup.go           #   appc lookup
 │   └── configure.go        #   appc configure
 └── internal/
     ├── api/                # App Store Connect API clients
@@ -172,7 +201,8 @@ appc/
     │   ├── apps.go         #   Apps endpoint
     │   ├── sales.go        #   Sales reports endpoint
     │   ├── reviews.go      #   Reviews endpoint
-    │   └── analytics.go    #   Analytics endpoint
+    │   ├── analytics.go    #   Analytics endpoint
+    │   └── lookup.go       #   iTunes Lookup API
     ├── auth/               # JWT (ES256) token generation
     │   └── jwt.go
     ├── client/             # HTTP client with retry and auth

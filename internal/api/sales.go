@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"encoding/csv"
@@ -87,25 +88,48 @@ func GetSalesReport(ctx context.Context, c *client.Client, params SalesReportPar
 
 	path := "/v1/salesReports?" + q.Encode()
 
-	resp, err := c.GetRaw(ctx, path)
+	resp, err := c.GetRawWithAccept(ctx, path, "application/a-gzip")
 	if err != nil {
 		return nil, fmt.Errorf("fetching sales report: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	if resp.StatusCode == 404 {
+		return nil, nil
+	}
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("sales report API error %d: %s", resp.StatusCode, string(body))
 	}
 
-	var reader io.Reader = resp.Body
-	if resp.Header.Get("Content-Encoding") == "gzip" {
+	var reader io.Reader
+	contentEncoding := resp.Header.Get("Content-Encoding")
+	contentType := resp.Header.Get("Content-Type")
+	if contentEncoding == "gzip" || contentType == "application/gzip" || contentType == "application/x-gzip" {
 		gz, err := gzip.NewReader(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("decompressing response: %w", err)
 		}
 		defer func() { _ = gz.Close() }()
 		reader = gz
+	} else {
+		// Detect gzip by magic bytes (0x1f 0x8b)
+		buf := make([]byte, 2)
+		n, err := io.ReadFull(resp.Body, buf)
+		if err != nil && n == 0 {
+			return nil, nil
+		}
+		combined := io.MultiReader(bytes.NewReader(buf[:n]), resp.Body)
+		if n == 2 && buf[0] == 0x1f && buf[1] == 0x8b {
+			gz, err := gzip.NewReader(combined)
+			if err != nil {
+				return nil, fmt.Errorf("decompressing response: %w", err)
+			}
+			defer func() { _ = gz.Close() }()
+			reader = gz
+		} else {
+			reader = combined
+		}
 	}
 
 	return parseTSV(reader)

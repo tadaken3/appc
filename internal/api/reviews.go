@@ -33,13 +33,15 @@ type ReviewParams struct {
 }
 
 type ReviewSummary struct {
-	Total    int            `json:"total"`
-	Average  float64        `json:"average"`
-	ByRating map[string]int `json:"by_rating"`
+	Total          int            `json:"total"`
+	Average        float64        `json:"average"`
+	ByRating       map[string]int `json:"by_rating"`
+	AppRating      float64        `json:"app_rating"`
+	AppRatingCount int            `json:"app_rating_count"`
 }
 
 func (s ReviewSummary) CSVHeaders() []string {
-	return []string{"total", "average", "rating_1", "rating_2", "rating_3", "rating_4", "rating_5"}
+	return []string{"total", "average", "rating_1", "rating_2", "rating_3", "rating_4", "rating_5", "app_rating", "app_rating_count"}
 }
 
 func (s ReviewSummary) CSVRow() []string {
@@ -48,6 +50,7 @@ func (s ReviewSummary) CSVRow() []string {
 		intToStr(s.Total), avg,
 		intToStr(s.ByRating["1"]), intToStr(s.ByRating["2"]), intToStr(s.ByRating["3"]),
 		intToStr(s.ByRating["4"]), intToStr(s.ByRating["5"]),
+		fmt.Sprintf("%.2f", s.AppRating), intToStr(s.AppRatingCount),
 	}
 }
 

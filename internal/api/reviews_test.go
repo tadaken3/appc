@@ -244,19 +244,30 @@ func TestSummarizeReviewsEmpty(t *testing.T) {
 
 func TestReviewSummaryCSVOutput(t *testing.T) {
 	s := ReviewSummary{
-		Total:    5,
-		Average:  3.6,
-		ByRating: map[string]int{"1": 1, "2": 0, "3": 1, "4": 1, "5": 2},
+		Total:          5,
+		Average:        3.6,
+		ByRating:       map[string]int{"1": 1, "2": 0, "3": 1, "4": 1, "5": 2},
+		AppRating:      4.81,
+		AppRatingCount: 27,
 	}
 	headers := s.CSVHeaders()
 	row := s.CSVRow()
-	if len(headers) != len(row) {
-		t.Errorf("headers len = %d, row len = %d", len(headers), len(row))
+	if len(headers) != 9 {
+		t.Errorf("headers len = %d, want 9", len(headers))
+	}
+	if len(row) != len(headers) {
+		t.Errorf("row len = %d, headers len = %d", len(row), len(headers))
 	}
 	if row[0] != "5" {
 		t.Errorf("row[0] (total) = %q, want 5", row[0])
 	}
 	if row[1] != "3.60" {
 		t.Errorf("row[1] (average) = %q, want 3.60", row[1])
+	}
+	if row[7] != "4.81" {
+		t.Errorf("row[7] (app_rating) = %q, want 4.81", row[7])
+	}
+	if row[8] != "27" {
+		t.Errorf("row[8] (app_rating_count) = %q, want 27", row[8])
 	}
 }
