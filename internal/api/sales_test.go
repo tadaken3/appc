@@ -38,6 +38,9 @@ func TestGetSalesReport(t *testing.T) {
 		if q.Get("filter[reportDate]") != "2025-01-15" {
 			t.Errorf("reportDate = %q", q.Get("filter[reportDate]"))
 		}
+		if got := r.Header.Get("Accept"); got != "application/a-gzip" {
+			t.Errorf("Accept = %q, want %q", got, "application/a-gzip")
+		}
 
 		w.Header().Set("Content-Encoding", "gzip")
 		w.WriteHeader(http.StatusOK)
@@ -87,6 +90,37 @@ func TestGetSalesReport(t *testing.T) {
 	}
 }
 
+func TestGetSalesReportGzipWithoutContentEncoding(t *testing.T) {
+	tsvData := "Provider\tProvider Country\tSKU\tDeveloper\tTitle\tVersion\tProduct Type Identifier\tUnits\tDeveloper Proceeds\tBegin Date\tEnd Date\tCustomer Currency\tCountry Code\tCurrency of Proceeds\tApple Identifier\tCustomer Price\tPromo Code\tParent Identifier\tSubscription\tPeriod\tCategory\tCMB\tDevice\tSupported Platforms\tProceeds Reason\tPreserved Pricing\tClient\tOrder Type\n" +
+		"APPLE\tUS\tSKU001\tDev\tMy App\t1.0\t1F\t10\t7.00\t01/15/2025\t01/15/2025\tUSD\tUS\tUSD\t123456\t0.99\t\t\t\t\tGames\t\tiPhone\t\t\t\t\t\n"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// No Content-Encoding header, just raw gzip bytes (as Apple's API actually does)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(gzipTSV(t, tsvData))
+	}))
+	defer srv.Close()
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	records, err := GetSalesReport(context.Background(), c, SalesReportParams{
+		ReportType: "SALES", ReportDate: "2025-01-15", Frequency: "DAILY", VendorNumber: "12345",
+	})
+	if err != nil {
+		t.Fatalf("GetSalesReport() error: %v", err)
+	}
+	if len(records) != 1 {
+		t.Fatalf("len = %d, want 1", len(records))
+	}
+	if records[0].SKU != "SKU001" {
+		t.Errorf("SKU = %q, want SKU001", records[0].SKU)
+	}
+	if records[0].Units != "10" {
+		t.Errorf("Units = %q, want 10", records[0].Units)
+	}
+}
+
 func TestGetSalesReportCSVOutput(t *testing.T) {
 	r := SalesRecord{
 		Provider:    "APPLE",
@@ -102,6 +136,45 @@ func TestGetSalesReportCSVOutput(t *testing.T) {
 	row := r.CSVRow()
 	if len(row) != len(headers) {
 		t.Errorf("CSVRow len = %d, headers len = %d", len(row), len(headers))
+	}
+}
+
+func TestGetSalesReport404ReturnsNil(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"errors":[{"status":"404","title":"No data found"}]}`))
+	}))
+	defer srv.Close()
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	records, err := GetSalesReport(context.Background(), c, SalesReportParams{
+		ReportType: "SALES", ReportDate: "2025-02-01", Frequency: "MONTHLY", VendorNumber: "12345",
+	})
+	if err != nil {
+		t.Fatalf("expected nil error for 404, got: %v", err)
+	}
+	if records != nil {
+		t.Errorf("expected nil records for 404, got %d records", len(records))
+	}
+}
+
+func TestGetSalesReport500StillErrors(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"errors":[{"status":"500","title":"Internal Server Error"}]}`))
+	}))
+	defer srv.Close()
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	_, err := GetSalesReport(context.Background(), c, SalesReportParams{
+		ReportType: "SALES", ReportDate: "2025-01-15", Frequency: "DAILY", VendorNumber: "12345",
+	})
+	if err == nil {
+		t.Fatal("expected error for 500, got nil")
 	}
 }
 

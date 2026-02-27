@@ -182,15 +182,92 @@ func TestListReviewsLimitStopsPagination(t *testing.T) {
 
 func TestReviewCSVOutput(t *testing.T) {
 	r := Review{
-		ID:      "r1",
-		Rating:  5,
-		Title:   "Good",
-		Body:    "Nice",
+		ID:       "r1",
+		Rating:   5,
+		Title:    "Good",
+		Body:     "Nice",
 		Reviewer: "user",
 	}
 	headers := r.CSVHeaders()
 	row := r.CSVRow()
 	if len(headers) != len(row) {
 		t.Errorf("headers len = %d, row len = %d", len(headers), len(row))
+	}
+}
+
+func TestSummarizeReviews(t *testing.T) {
+	reviews := []Review{
+		{Rating: 5},
+		{Rating: 5},
+		{Rating: 4},
+		{Rating: 3},
+		{Rating: 1},
+	}
+
+	s := SummarizeReviews(reviews)
+
+	if s.Total != 5 {
+		t.Errorf("Total = %d, want 5", s.Total)
+	}
+
+	// average = (5+5+4+3+1)/5 = 3.6
+	if s.Average < 3.59 || s.Average > 3.61 {
+		t.Errorf("Average = %.2f, want 3.60", s.Average)
+	}
+
+	if s.ByRating["5"] != 2 {
+		t.Errorf("ByRating[5] = %d, want 2", s.ByRating["5"])
+	}
+	if s.ByRating["4"] != 1 {
+		t.Errorf("ByRating[4] = %d, want 1", s.ByRating["4"])
+	}
+	if s.ByRating["3"] != 1 {
+		t.Errorf("ByRating[3] = %d, want 1", s.ByRating["3"])
+	}
+	if s.ByRating["2"] != 0 {
+		t.Errorf("ByRating[2] = %d, want 0", s.ByRating["2"])
+	}
+	if s.ByRating["1"] != 1 {
+		t.Errorf("ByRating[1] = %d, want 1", s.ByRating["1"])
+	}
+}
+
+func TestSummarizeReviewsEmpty(t *testing.T) {
+	s := SummarizeReviews([]Review{})
+	if s.Total != 0 {
+		t.Errorf("Total = %d, want 0", s.Total)
+	}
+	if s.Average != 0.0 {
+		t.Errorf("Average = %.2f, want 0.00", s.Average)
+	}
+}
+
+func TestReviewSummaryCSVOutput(t *testing.T) {
+	s := ReviewSummary{
+		Total:          5,
+		Average:        3.6,
+		ByRating:       map[string]int{"1": 1, "2": 0, "3": 1, "4": 1, "5": 2},
+		AppRating:      4.81,
+		AppRatingCount: 27,
+	}
+	headers := s.CSVHeaders()
+	row := s.CSVRow()
+	if len(headers) != 9 {
+		t.Errorf("headers len = %d, want 9", len(headers))
+	}
+	if len(row) != len(headers) {
+		t.Errorf("row len = %d, headers len = %d", len(row), len(headers))
+	}
+	if row[0] != "5" {
+		t.Errorf("row[0] (total) = %q, want 5", row[0])
+	}
+	if row[1] != "3.60" {
+		t.Errorf("row[1] (average) = %q, want 3.60", row[1])
+	}
+	if row[7] != "4.81" {
+		t.Errorf("row[7] (app_rating) = %q, want 4.81", row[7])
+	}
+	if row[8] != "27" {
+		t.Errorf("row[8] (app_rating_count) = %q, want 27", row[8])
 	}
 }

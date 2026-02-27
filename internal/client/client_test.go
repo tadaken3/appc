@@ -173,6 +173,37 @@ func TestPostRetryPreservesBody(t *testing.T) {
 	}
 }
 
+func TestGetRawWithAccept(t *testing.T) {
+	var gotAccept string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAccept = r.Header.Get("Accept")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("gzip data"))
+	}))
+	defer srv.Close()
+
+	c := New(&mockTokenProvider{token: "tok"})
+	c.BaseURL = srv.URL
+
+	resp, err := c.GetRawWithAccept(context.Background(), "/v1/salesReports", "application/a-gzip")
+	if err != nil {
+		t.Fatalf("GetRawWithAccept() error: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if gotAccept != "application/a-gzip" {
+		t.Errorf("Accept = %q, want %q", gotAccept, "application/a-gzip")
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("ReadAll() error: %v", err)
+	}
+	if string(body) != "gzip data" {
+		t.Errorf("body = %q, want %q", body, "gzip data")
+	}
+}
+
 func TestRetryAfterParsesSeconds(t *testing.T) {
 	tests := []struct {
 		name  string

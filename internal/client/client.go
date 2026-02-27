@@ -49,6 +49,10 @@ func (c *Client) GetRaw(ctx context.Context, path string) (*http.Response, error
 	return c.do(ctx, path)
 }
 
+func (c *Client) GetRawWithAccept(ctx context.Context, path, accept string) (*http.Response, error) {
+	return c.doMethodWithHeaders(ctx, http.MethodGet, path, nil, map[string]string{"Accept": accept})
+}
+
 func (c *Client) Post(ctx context.Context, path string, body io.Reader) (*http.Response, error) {
 	return c.doMethod(ctx, http.MethodPost, path, body)
 }
@@ -58,6 +62,10 @@ func (c *Client) do(ctx context.Context, path string) (*http.Response, error) {
 }
 
 func (c *Client) doMethod(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
+	return c.doMethodWithHeaders(ctx, method, path, body, nil)
+}
+
+func (c *Client) doMethodWithHeaders(ctx context.Context, method, path string, body io.Reader, headers map[string]string) (*http.Response, error) {
 	token, err := c.tokens.Token()
 	if err != nil {
 		return nil, fmt.Errorf("getting token: %w", err)
@@ -87,6 +95,9 @@ func (c *Client) doMethod(ctx context.Context, method, path string, body io.Read
 		req.Header.Set("Authorization", "Bearer "+token)
 		if method == http.MethodPost {
 			req.Header.Set("Content-Type", "application/json")
+		}
+		for k, v := range headers {
+			req.Header.Set(k, v)
 		}
 
 		resp, err := c.http.Do(req)

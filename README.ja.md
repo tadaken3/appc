@@ -59,64 +59,108 @@ appc configure
 
 ### `appc apps`
 
-App Store Connect アカウントのアプリ一覧を取得します。
+App Store Connect アカウントのアプリ一覧を取得します。iTunes Lookup API から各アプリの App Store 評価を自動的に付与します。
+
+| フラグ | 型 | デフォルト | 説明 |
+|---|---|---|---|
+| `--country` | string | `jp` | 評価取得に使用する国コード |
 
 ```bash
 appc apps
-appc apps --format csv
+appc apps --country us --format csv
+```
+
+### `appc lookup`
+
+iTunes Lookup API からアプリの評価・メタデータを取得します。複数の App ID をカンマ区切りで指定でき、競合アプリの調査にも使えます（App Store Connect の認証不要）。
+
+| フラグ | 型 | デフォルト | 説明 |
+|---|---|---|---|
+| `--app` | string | *（必須）* | アプリ ID（カンマ区切りで複数指定可） |
+| `--country` | string | `jp` | ストア検索に使用する国コード |
+
+```bash
+appc lookup --app 6745560143 --country jp
+appc lookup --app 6745560143,123456789 --country us    # 競合調査
+appc lookup --app 6745560143 --format csv
 ```
 
 ### `appc sales`
 
-売上レポートをダウンロードします。
+売上レポートをダウンロードします。データのない日付（HTTP 404）はエラーではなく空結果として扱われます。
 
 | フラグ | 型 | デフォルト | 説明 |
 |---|---|---|---|
 | `--date` | string | *（必須）* | レポート日付（`YYYY-MM-DD` または `YYYY-MM`） |
+| `--from` | string | | 開始日付（`YYYY-MM-DD`、`--to` と併用、日次のみ） |
+| `--to` | string | | 終了日付（`YYYY-MM-DD`、`--from` と併用、日次のみ） |
 | `--type` | string | `SALES` | レポートタイプ: `SALES`, `PRE_ORDER`, `NEWSSTAND` |
 | `--frequency` | string | `DAILY` | 頻度: `DAILY`, `WEEKLY`, `MONTHLY`, `YEARLY` |
 | `--sub-type` | string | `SUMMARY` | サブタイプ: `SUMMARY`, `DETAILED`, `OPT_IN` |
 | `--vendor` | string | *（設定値）* | ベンダー番号（設定値を上書き） |
 
+*\* `--date` または `--from`/`--to` のいずれかが必須です。*
+
 ```bash
 appc sales --date 2025-01-15
 appc sales --date 2025-01-15 --type SALES --frequency DAILY --format csv
 appc sales --date 2025-01 --frequency MONTHLY --vendor 12345678
+appc sales --from 2025-01-01 --to 2025-01-31
 ```
 
 ### `appc reviews`
 
-アプリのカスタマーレビューを取得します。
+アプリのカスタマーレビューを取得します。`--summary` を指定すると、iTunes の全体評価を含む評価分布サマリーを表示します。
 
 | フラグ | 型 | デフォルト | 説明 |
 |---|---|---|---|
 | `--app` | string | *（必須）* | アプリ ID |
 | `--rating` | int | `0` | 星評価でフィルタ（1〜5、0 = 全件） |
 | `--limit` | int | `100` | 取得するレビューの最大件数 |
+| `--summary` | bool | `false` | 個別レビューの代わりに評価サマリーを表示 |
+| `--country` | string | `jp` | 評価取得に使用する国コード（`--summary` 時に使用） |
 
 ```bash
 appc reviews --app <APP_ID>
 appc reviews --app <APP_ID> --rating 5 --limit 50
+appc reviews --app <APP_ID> --summary                    # App Store 全体評価付き
+appc reviews --app <APP_ID> --summary --country us
 appc reviews --app <APP_ID> --format csv > reviews.csv
 ```
 
 ### `appc analytics`
 
-App Store のアナリティクスレポートをリクエスト・取得します。
+App Store のアナリティクスレポートをリクエスト・取得します。セグメント CSV をダウンロードしてパースした結果を出力します。
 
 | フラグ | 型 | デフォルト | 説明 |
 |---|---|---|---|
 | `--app` | string | *（必須）* | アプリ ID |
-| `--category` | string | | レポートカテゴリ（例: `APP_USAGE`, `APP_STORE_ENGAGEMENT`） |
+| `--category` | string | | レポートカテゴリ |
+| `--snapshot` | bool | `false` | ONE_TIME_SNAPSHOT で過去データを一括取得 |
+
+利用可能なカテゴリ: `APP_USAGE`, `APP_STORE_ENGAGEMENT`, `COMMERCE`, `FRAMEWORK_USAGE`, `PERFORMANCE`
 
 ```bash
-appc analytics --app <APP_ID>
+# 最新のアナリティクスを取得（ONGOING モード — リクエスト作成日以降のデータ）
 appc analytics --app <APP_ID> --category APP_USAGE
+appc analytics --app <APP_ID> --category APP_STORE_ENGAGEMENT --format csv
+
+# 過去データを一括取得（アプリ作成日〜リクエスト日）
+appc analytics --app <APP_ID> --category APP_USAGE --snapshot
+
+# Claude にパイプして分析
+appc analytics --app <APP_ID> --category APP_USAGE | claude "インストールのトレンドを分析して"
 ```
+
+> **注意:** 初回実行時は Apple 側でレポートインスタンスの生成に時間がかかります（ONGOING は 1〜2 日、スナップショットは数時間）。2 回目以降はすぐにデータが取得できます。
 
 ### `appc configure`
 
 認証情報を対話形式で設定・更新します。既存の値がデフォルトとして表示され、Enter を押すとそのまま保持されます。
+
+| フラグ | 型 | デフォルト | 説明 |
+|---|---|---|---|
+| `--validate` | bool | `false` | 設定を変更せずにバリデーションのみ実行 |
 
 ## グローバルフラグ
 
@@ -153,6 +197,7 @@ appc/
 │   ├── sales.go            #   appc sales
 │   ├── reviews.go          #   appc reviews
 │   ├── analytics.go        #   appc analytics
+│   ├── lookup.go           #   appc lookup
 │   └── configure.go        #   appc configure
 └── internal/
     ├── api/                # App Store Connect API クライアント
@@ -160,7 +205,8 @@ appc/
     │   ├── apps.go         #   アプリ エンドポイント
     │   ├── sales.go        #   売上レポート エンドポイント
     │   ├── reviews.go      #   レビュー エンドポイント
-    │   └── analytics.go    #   アナリティクス エンドポイント
+    │   ├── analytics.go    #   アナリティクス エンドポイント
+    │   └── lookup.go       #   iTunes Lookup API
     ├── auth/               # JWT（ES256）トークン生成
     │   └── jwt.go
     ├── client/             # リトライ・認証付き HTTP クライアント

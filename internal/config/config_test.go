@@ -71,6 +71,66 @@ func TestSaveCreatesDirectory(t *testing.T) {
 	}
 }
 
+func TestValidate(t *testing.T) {
+	dir := t.TempDir()
+	keyPath := filepath.Join(dir, "key.p8")
+	if err := os.WriteFile(keyPath, []byte("dummy"), 0600); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	t.Run("valid config", func(t *testing.T) {
+		cfg := &Config{
+			IssuerID:       "issuer-123",
+			KeyID:          "key-456",
+			PrivateKeyPath: keyPath,
+			VendorNumber:   "12345678",
+		}
+		if err := Validate(cfg); err != nil {
+			t.Errorf("Validate() unexpected error: %v", err)
+		}
+	})
+
+	t.Run("missing issuer_id", func(t *testing.T) {
+		cfg := &Config{KeyID: "key-456", PrivateKeyPath: keyPath, VendorNumber: "12345678"}
+		if err := Validate(cfg); err == nil {
+			t.Error("Validate() should return error for missing IssuerID")
+		}
+	})
+
+	t.Run("missing key_id", func(t *testing.T) {
+		cfg := &Config{IssuerID: "issuer-123", PrivateKeyPath: keyPath, VendorNumber: "12345678"}
+		if err := Validate(cfg); err == nil {
+			t.Error("Validate() should return error for missing KeyID")
+		}
+	})
+
+	t.Run("missing private_key_path", func(t *testing.T) {
+		cfg := &Config{IssuerID: "issuer-123", KeyID: "key-456", VendorNumber: "12345678"}
+		if err := Validate(cfg); err == nil {
+			t.Error("Validate() should return error for missing PrivateKeyPath")
+		}
+	})
+
+	t.Run("private key file not found", func(t *testing.T) {
+		cfg := &Config{
+			IssuerID:       "issuer-123",
+			KeyID:          "key-456",
+			PrivateKeyPath: "/nonexistent/key.p8",
+			VendorNumber:   "12345678",
+		}
+		if err := Validate(cfg); err == nil {
+			t.Error("Validate() should return error when private key file does not exist")
+		}
+	})
+
+	t.Run("missing vendor_number", func(t *testing.T) {
+		cfg := &Config{IssuerID: "issuer-123", KeyID: "key-456", PrivateKeyPath: keyPath}
+		if err := Validate(cfg); err == nil {
+			t.Error("Validate() should return error for missing VendorNumber")
+		}
+	})
+}
+
 func TestSaveFilePermissions(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.json")

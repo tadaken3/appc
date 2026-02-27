@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -13,6 +12,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var appsCountry string
+
 var appsCmd = &cobra.Command{
 	Use:   "apps",
 	Short: "List all apps",
@@ -21,6 +22,7 @@ var appsCmd = &cobra.Command{
 }
 
 func init() {
+	appsCmd.Flags().StringVar(&appsCountry, "country", "jp", "Country code for rating lookup")
 	rootCmd.AddCommand(appsCmd)
 }
 
@@ -30,9 +32,28 @@ func runApps(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	apps, err := api.ListApps(context.Background(), c)
+	ctx := cmd.Context()
+	apps, err := api.ListApps(ctx, c)
 	if err != nil {
 		return err
+	}
+
+	// Enrich with ratings from iTunes Lookup API
+	var ids []string
+	for _, a := range apps {
+		ids = append(ids, a.ID)
+	}
+	if len(ids) > 0 {
+		warn := func(id string, err error) {
+			_, _ = fmt.Fprintf(os.Stderr, "warning: rating lookup %s: %v\n", id, err)
+		}
+		ratings := api.LookupAppRatings(ctx, ids, appsCountry, warn)
+		for i, a := range apps {
+			if r, ok := ratings[a.ID]; ok {
+				apps[i].Rating = r.Rating
+				apps[i].RatingCount = r.RatingCount
+			}
+		}
 	}
 
 	return output.Write(os.Stdout, format, apps)

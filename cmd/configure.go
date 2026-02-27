@@ -11,6 +11,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var configureValidate bool
+
 var configureCmd = &cobra.Command{
 	Use:   "configure",
 	Short: "Set up authentication credentials",
@@ -19,11 +21,23 @@ var configureCmd = &cobra.Command{
 }
 
 func init() {
+	configureCmd.Flags().BoolVar(&configureValidate, "validate", false, "Validate the current configuration")
 	rootCmd.AddCommand(configureCmd)
 }
 
 func runConfigure(cmd *cobra.Command, args []string) error {
+	if configureValidate {
+		return runValidate(cmd.ErrOrStderr())
+	}
 	return runConfigureWith(os.Stdin, cmd.OutOrStdout())
+}
+
+func runValidate(out io.Writer) error {
+	if err := config.ValidateFromPath(config.DefaultConfigPath()); err != nil {
+		return err
+	}
+	_, _ = fmt.Fprintln(out, "Configuration is valid.")
+	return nil
 }
 
 func runConfigureWith(in io.Reader, out io.Writer) error {
