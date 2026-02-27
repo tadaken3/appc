@@ -6,10 +6,12 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -162,7 +164,10 @@ func DownloadAnalyticsSegmentCSV(ctx context.Context, segmentURL string) ([]Anal
 		// Try gzip decompression by reading initial bytes
 		buf := make([]byte, 2)
 		n, err := io.ReadFull(resp.Body, buf)
-		if err != nil && n == 0 {
+		if n == 0 {
+			if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+				return nil, fmt.Errorf("reading response: %w", err)
+			}
 			return nil, nil
 		}
 		combined := io.MultiReader(bytes.NewReader(buf[:n]), resp.Body)
@@ -292,7 +297,7 @@ func getExistingReportRequestID(ctx context.Context, c *client.Client, appID, ac
 	}
 
 	if len(result.Data) == 0 {
-		return "", fmt.Errorf("no existing ONGOING analytics report request found")
+		return "", fmt.Errorf("no existing %s analytics report request found", accessType)
 	}
 
 	return result.Data[0].ID, nil
@@ -372,6 +377,69 @@ func GetAnalyticsInstances(ctx context.Context, c *client.Client, reportID strin
 	}
 
 	return instances, nil
+}
+
+// FetchAllSegmentRecords orchestrates the full analytics pipeline:
+// reports → instances → select latest instance → segments → CSV download.
+func FetchAllSegmentRecords(ctx context.Context, c *client.Client, appID, accessType, category string, log func(string, ...any)) ([]AnalyticsSegmentRecord, error) {
+	log("Requesting analytics report (%s)...\n", accessType)
+	reqID, err := RequestAnalyticsReportWithAccessType(ctx, c, appID, accessType)
+	if err != nil {
+		return nil, err
+	}
+	log("Request ID: %s\n", reqID)
+
+	reports, err := GetAnalyticsReports(ctx, c, reqID, category)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(reports) == 0 {
+		log("No reports found.\n")
+		return nil, nil
+	}
+
+	var allRecords []AnalyticsSegmentRecord
+	for _, report := range reports {
+		log("Fetching instances for report %q (%s)...\n", report.Name, report.Category)
+
+		instances, err := GetAnalyticsInstances(ctx, c, report.ID)
+		if err != nil {
+			return nil, fmt.Errorf("getting instances for report %s: %w", report.ID, err)
+		}
+
+		if len(instances) == 0 {
+			log("  No instances found, skipping.\n")
+			continue
+		}
+
+		// Sort by processing date and use the latest instance
+		sort.Slice(instances, func(i, j int) bool {
+			return instances[i].ProcessingDate < instances[j].ProcessingDate
+		})
+		latest := instances[len(instances)-1]
+		log("Using instance %s (date: %s)...\n", latest.ID, latest.ProcessingDate)
+
+		segments, err := GetAnalyticsSegments(ctx, c, latest.ID)
+		if err != nil {
+			return nil, fmt.Errorf("getting segments for instance %s: %w", latest.ID, err)
+		}
+
+		for _, seg := range segments {
+			if seg.URL == "" {
+				continue
+			}
+			log("Downloading segment %s (%d bytes)...\n", seg.ID, seg.SizeInBytes)
+
+			records, err := DownloadAnalyticsSegmentCSV(ctx, seg.URL)
+			if err != nil {
+				return nil, fmt.Errorf("downloading segment %s: %w", seg.ID, err)
+			}
+			allRecords = append(allRecords, records...)
+		}
+	}
+
+	return allRecords, nil
 }
 
 func GetAnalyticsSegments(ctx context.Context, c *client.Client, instanceID string) ([]AnalyticsSegment, error) {

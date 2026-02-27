@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"time"
 )
 
@@ -27,6 +28,13 @@ func (r AppRating) CSVRow() []string {
 // LookupBaseURL is the base URL for iTunes Lookup API. Tests can override this.
 var LookupBaseURL = "https://itunes.apple.com"
 
+var lookupHTTPClient = &http.Client{Timeout: 30 * time.Second}
+
+var (
+	appIDPattern   = regexp.MustCompile(`^\d+$`)
+	countryPattern = regexp.MustCompile(`^[a-zA-Z]{2}$`)
+)
+
 type lookupResponse struct {
 	ResultCount int            `json:"resultCount"`
 	Results     []lookupResult `json:"results"`
@@ -40,6 +48,13 @@ type lookupResult struct {
 }
 
 func LookupAppRating(ctx context.Context, appID, country string) (AppRating, error) {
+	if !appIDPattern.MatchString(appID) {
+		return AppRating{}, fmt.Errorf("invalid app ID %q: must be numeric", appID)
+	}
+	if !countryPattern.MatchString(country) {
+		return AppRating{}, fmt.Errorf("invalid country code %q: must be a 2-letter code", country)
+	}
+
 	url := fmt.Sprintf("%s/lookup?id=%s&country=%s", LookupBaseURL, appID, country)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -47,8 +62,7 @@ func LookupAppRating(ctx context.Context, appID, country string) (AppRating, err
 		return AppRating{}, fmt.Errorf("creating lookup request: %w", err)
 	}
 
-	httpClient := &http.Client{Timeout: 30 * time.Second}
-	resp, err := httpClient.Do(req)
+	resp, err := lookupHTTPClient.Do(req)
 	if err != nil {
 		return AppRating{}, fmt.Errorf("iTunes lookup: %w", err)
 	}

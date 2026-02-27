@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -116,7 +117,10 @@ func GetSalesReport(ctx context.Context, c *client.Client, params SalesReportPar
 		// Detect gzip by magic bytes (0x1f 0x8b)
 		buf := make([]byte, 2)
 		n, err := io.ReadFull(resp.Body, buf)
-		if err != nil && n == 0 {
+		if n == 0 {
+			if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+				return nil, fmt.Errorf("reading response preamble: %w", err)
+			}
 			return nil, nil
 		}
 		combined := io.MultiReader(bytes.NewReader(buf[:n]), resp.Body)

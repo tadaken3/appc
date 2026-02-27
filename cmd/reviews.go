@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -47,14 +46,15 @@ func runReviews(cmd *cobra.Command, args []string) error {
 		Limit:  reviewsLimit,
 	}
 
-	reviews, err := api.ListReviews(context.Background(), c, params)
+	ctx := cmd.Context()
+	reviews, err := api.ListReviews(ctx, c, params)
 	if err != nil {
 		return err
 	}
 
 	if reviewsSummary {
 		summary := api.SummarizeReviews(reviews)
-		rating, err := api.LookupAppRating(context.Background(), reviewsAppID, reviewsCountry)
+		rating, err := api.LookupAppRating(ctx, reviewsAppID, reviewsCountry)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "warning: rating lookup: %v\n", err)
 		} else {

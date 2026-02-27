@@ -27,7 +27,7 @@ func init() {
 
 func runConfigure(cmd *cobra.Command, args []string) error {
 	if configureValidate {
-		return runValidate(cmd.OutOrStdout())
+		return runValidate(cmd.ErrOrStderr())
 	}
 	return runConfigureWith(os.Stdin, cmd.OutOrStdout())
 }

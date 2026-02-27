@@ -195,7 +195,10 @@ func TestGetRawWithAccept(t *testing.T) {
 		t.Errorf("Accept = %q, want %q", gotAccept, "application/a-gzip")
 	}
 
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("ReadAll() error: %v", err)
+	}
 	if string(body) != "gzip data" {
 		t.Errorf("body = %q, want %q", body, "gzip data")
 	}

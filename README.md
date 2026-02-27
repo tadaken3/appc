@@ -91,7 +91,7 @@ Download sales and trends reports. Dates with no data (HTTP 404) are treated as 
 
 | Flag | Type | Default | Description |
 |---|---|---|---|
-| `--date` | string | *(required)** | Report date (`YYYY-MM-DD` or `YYYY-MM`) |
+| `--date` | string | *(required)* | Report date (`YYYY-MM-DD` or `YYYY-MM`) |
 | `--from` | string | | Start date for range (`YYYY-MM-DD`, requires `--to`, daily only) |
 | `--to` | string | | End date for range (`YYYY-MM-DD`, requires `--from`, daily only) |
 | `--type` | string | `SALES` | Report type: `SALES`, `PRE_ORDER`, `NEWSSTAND` |
@@ -157,6 +157,10 @@ appc analytics --app <APP_ID> --category APP_USAGE | claude "Analyze the install
 ### `appc configure`
 
 Interactively set up or update authentication credentials. Existing values are shown as defaults — press Enter to keep them.
+
+| Flag | Type | Default | Description |
+|---|---|---|---|
+| `--validate` | bool | `false` | Validate the current configuration without modifying it |
 
 ## Global Flags
 

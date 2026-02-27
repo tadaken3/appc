@@ -91,7 +91,7 @@ appc lookup --app 6745560143 --format csv
 
 | フラグ | 型 | デフォルト | 説明 |
 |---|---|---|---|
-| `--date` | string | *（必須）** | レポート日付（`YYYY-MM-DD` または `YYYY-MM`） |
+| `--date` | string | *（必須）* | レポート日付（`YYYY-MM-DD` または `YYYY-MM`） |
 | `--from` | string | | 開始日付（`YYYY-MM-DD`、`--to` と併用、日次のみ） |
 | `--to` | string | | 終了日付（`YYYY-MM-DD`、`--from` と併用、日次のみ） |
 | `--type` | string | `SALES` | レポートタイプ: `SALES`, `PRE_ORDER`, `NEWSSTAND` |
@@ -157,6 +157,10 @@ appc analytics --app <APP_ID> --category APP_USAGE | claude "インストール�
 ### `appc configure`
 
 認証情報を対話形式で設定・更新します。既存の値がデフォルトとして表示され、Enter を押すとそのまま保持されます。
+
+| フラグ | 型 | デフォルト | 説明 |
+|---|---|---|---|
+| `--validate` | bool | `false` | 設定を変更せずにバリデーションのみ実行 |
 
 ## グローバルフラグ
 

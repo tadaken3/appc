@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -36,7 +35,7 @@ func runLookup(cmd *cobra.Command, args []string) error {
 		ids[i] = strings.TrimSpace(ids[i])
 	}
 
-	ctx := context.Background()
+	ctx := cmd.Context()
 	warn := func(id string, err error) {
 		_, _ = fmt.Fprintf(os.Stderr, "warning: lookup %s: %v\n", id, err)
 	}

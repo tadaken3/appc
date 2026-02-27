@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/kenta-tanaka/appc/internal/api"
 	"github.com/kenta-tanaka/appc/internal/output"
@@ -53,6 +54,9 @@ func runSales(cmd *cobra.Command, args []string) error {
 	if salesFrom != "" || salesTo != "" {
 		if salesFrom == "" || salesTo == "" {
 			return fmt.Errorf("--from and --to must be used together")
+		}
+		if strings.ToUpper(salesFrequency) != "DAILY" {
+			return fmt.Errorf("--from and --to are supported only with --frequency DAILY")
 		}
 		dates, err := sales.DateRange(salesFrom, salesTo)
 		if err != nil {

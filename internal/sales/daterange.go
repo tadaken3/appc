@@ -18,7 +18,7 @@ func DateRange(from, to string) ([]string, error) {
 		return nil, fmt.Errorf("invalid --to date %q (use YYYY-MM-DD): %w", to, err)
 	}
 	if end.Before(start) {
-		return nil, fmt.Errorf("--to must be after --from")
+		return nil, fmt.Errorf("--to must be on or after --from")
 	}
 	var dates []string
 	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {

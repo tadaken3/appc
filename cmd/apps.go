@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -33,7 +32,8 @@ func runApps(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	apps, err := api.ListApps(context.Background(), c)
+	ctx := cmd.Context()
+	apps, err := api.ListApps(ctx, c)
 	if err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func runApps(cmd *cobra.Command, args []string) error {
 		warn := func(id string, err error) {
 			_, _ = fmt.Fprintf(os.Stderr, "warning: rating lookup %s: %v\n", id, err)
 		}
-		ratings := api.LookupAppRatings(context.Background(), ids, appsCountry, warn)
+		ratings := api.LookupAppRatings(ctx, ids, appsCountry, warn)
 		for i, a := range apps {
 			if r, ok := ratings[a.ID]; ok {
 				apps[i].Rating = r.Rating
