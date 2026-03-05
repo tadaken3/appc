@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/kenta-tanaka/appc/internal/client"
@@ -62,12 +63,12 @@ func TestListSubscriptionGroups(t *testing.T) {
 }
 
 func TestListSubscriptionGroupsPagination(t *testing.T) {
-	page := 0
+	var page atomic.Int32
 	var srvURL string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		page++
+		p := page.Add(1)
 		var resp Response[SubscriptionGroupResource]
-		if page == 1 {
+		if p == 1 {
 			resp = Response[SubscriptionGroupResource]{
 				Data: []SubscriptionGroupResource{
 					{ID: "g1", Type: "subscriptionGroups", Attributes: SubscriptionGroupAttributes{ReferenceName: "Group1"}},
@@ -197,12 +198,12 @@ func TestListSubscriptions(t *testing.T) {
 }
 
 func TestListSubscriptionsPagination(t *testing.T) {
-	page := 0
+	var page atomic.Int32
 	var srvURL string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		page++
+		p := page.Add(1)
 		var resp Response[SubscriptionResource]
-		if page == 1 {
+		if p == 1 {
 			resp = Response[SubscriptionResource]{
 				Data: []SubscriptionResource{
 					{ID: "s1", Type: "subscriptions", Attributes: SubscriptionAttributes{Name: "Plan1", ProductID: "p1", State: "APPROVED"}},
@@ -358,25 +359,84 @@ func TestFetchAppSubscriptionsWithGroupFilter(t *testing.T) {
 
 func TestSubscriptionInfoCSVOutput(t *testing.T) {
 	s := SubscriptionInfo{
-		GroupID:        "g1",
-		GroupName:      "Premium",
-		SubscriptionID: "s1",
-		Name:           "Monthly",
-		ProductID:      "com.example.monthly",
-		State:          "APPROVED",
+		GroupID:            "g1",
+		GroupName:          "Premium",
+		SubscriptionID:     "s1",
+		Name:               "Monthly",
+		ProductID:          "com.example.monthly",
+		State:              "APPROVED",
+		SubscriptionPeriod: "ONE_MONTH",
+		GroupLevel:         1,
 	}
 	headers := s.CSVHeaders()
 	row := s.CSVRow()
 	if len(headers) != len(row) {
 		t.Errorf("headers len = %d, row len = %d", len(headers), len(row))
 	}
-	if row[0] != "g1" {
-		t.Errorf("row[0] (group_id) = %q, want g1", row[0])
+	expected := []string{"g1", "Premium", "s1", "Monthly", "com.example.monthly", "APPROVED", "ONE_MONTH", "1"}
+	for i, want := range expected {
+		if row[i] != want {
+			t.Errorf("row[%d] (%s) = %q, want %q", i, headers[i], row[i], want)
+		}
 	}
-	if row[1] != "Premium" {
-		t.Errorf("row[1] (group_name) = %q, want Premium", row[1])
+}
+
+func TestListSubscriptionGroupsHTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	_, err := ListSubscriptionGroups(context.Background(), c, "APP1")
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
-	if row[2] != "s1" {
-		t.Errorf("row[2] (subscription_id) = %q, want s1", row[2])
+}
+
+func TestListSubscriptionsHTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	_, err := ListSubscriptions(context.Background(), c, "g1")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestListSubscriptionGroupsInvalidJSON(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("not json"))
+	}))
+	defer srv.Close()
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	_, err := ListSubscriptionGroups(context.Background(), c, "APP1")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestListSubscriptionsInvalidJSON(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("not json"))
+	}))
+	defer srv.Close()
+
+	c := client.New(&stubTokenProvider{})
+	c.BaseURL = srv.URL
+
+	_, err := ListSubscriptions(context.Background(), c, "g1")
+	if err == nil {
+		t.Fatal("expected error, got nil")
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 
 	"github.com/kenta-tanaka/appc/internal/client"
 )
@@ -76,7 +77,7 @@ func (s SubscriptionInfo) CSVRow() []string {
 // ListSubscriptionGroups fetches subscription groups for an app.
 func ListSubscriptionGroups(ctx context.Context, c *client.Client, appID string) ([]SubscriptionGroup, error) {
 	var groups []SubscriptionGroup
-	path := fmt.Sprintf("/v1/apps/%s/subscriptionGroups", appID)
+	path := fmt.Sprintf("/v1/apps/%s/subscriptionGroups", url.PathEscape(appID))
 
 	for path != "" {
 		resp, err := c.Get(ctx, path)
@@ -110,7 +111,7 @@ func ListSubscriptionGroups(ctx context.Context, c *client.Client, appID string)
 // ListSubscriptions fetches subscriptions within a subscription group.
 func ListSubscriptions(ctx context.Context, c *client.Client, groupID string) ([]SubscriptionInfo, error) {
 	var subs []SubscriptionInfo
-	path := fmt.Sprintf("/v1/subscriptionGroups/%s/subscriptions", groupID)
+	path := fmt.Sprintf("/v1/subscriptionGroups/%s/subscriptions", url.PathEscape(groupID))
 
 	for path != "" {
 		resp, err := c.Get(ctx, path)
@@ -150,18 +151,36 @@ func ListSubscriptions(ctx context.Context, c *client.Client, groupID string) ([
 func FetchAppSubscriptions(ctx context.Context, c *client.Client, params SubscriptionParams) ([]SubscriptionInfo, error) {
 	groups, err := ListSubscriptionGroups(ctx, c, params.AppID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("fetching subscription groups: %w", err)
+	}
+
+	if params.GroupID != "" {
+		var group *SubscriptionGroup
+		for i := range groups {
+			if groups[i].ID == params.GroupID {
+				group = &groups[i]
+				break
+			}
+		}
+		if group == nil {
+			return nil, nil
+		}
+		subs, err := ListSubscriptions(ctx, c, group.ID)
+		if err != nil {
+			return nil, fmt.Errorf("fetching subscriptions for group %q: %w", group.ID, err)
+		}
+		for i := range subs {
+			subs[i].GroupID = group.ID
+			subs[i].GroupName = group.ReferenceName
+		}
+		return subs, nil
 	}
 
 	var results []SubscriptionInfo
 	for _, g := range groups {
-		if params.GroupID != "" && g.ID != params.GroupID {
-			continue
-		}
-
 		subs, err := ListSubscriptions(ctx, c, g.ID)
 		if err != nil {
-			return nil, fmt.Errorf("fetching subscriptions for group %s: %w", g.ID, err)
+			return nil, fmt.Errorf("fetching subscriptions for group %q: %w", g.ID, err)
 		}
 
 		for i := range subs {
