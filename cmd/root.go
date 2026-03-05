@@ -12,6 +12,8 @@ var rootCmd = &cobra.Command{
 	Short:   "App Store Connect CLI tool",
 	Long:    "A CLI tool for fetching App Store Connect data (sales reports, reviews, analytics).",
 	Version: version,
+	SilenceUsage:  true,
+	SilenceErrors: true,
 }
 
 func init() {

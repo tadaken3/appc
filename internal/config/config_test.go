@@ -131,6 +131,101 @@ func TestValidate(t *testing.T) {
 	})
 }
 
+func TestLoadWithEnvOverrides(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+
+	// Save a config with base values
+	cfg := &Config{
+		IssuerID:       "file-issuer",
+		KeyID:          "file-key",
+		PrivateKeyPath: "/file/key.p8",
+		VendorNumber:   "11111111",
+	}
+	if err := Save(cfg, path); err != nil {
+		t.Fatalf("Save() error: %v", err)
+	}
+
+	// Set env vars to override
+	t.Setenv("APPC_ISSUER_ID", "env-issuer")
+	t.Setenv("APPC_KEY_ID", "env-key")
+	t.Setenv("APPC_PRIVATE_KEY_PATH", "/env/key.p8")
+	t.Setenv("APPC_VENDOR_NUMBER", "22222222")
+
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if loaded.IssuerID != "env-issuer" {
+		t.Errorf("IssuerID = %q, want %q", loaded.IssuerID, "env-issuer")
+	}
+	if loaded.KeyID != "env-key" {
+		t.Errorf("KeyID = %q, want %q", loaded.KeyID, "env-key")
+	}
+	if loaded.PrivateKeyPath != "/env/key.p8" {
+		t.Errorf("PrivateKeyPath = %q, want %q", loaded.PrivateKeyPath, "/env/key.p8")
+	}
+	if loaded.VendorNumber != "22222222" {
+		t.Errorf("VendorNumber = %q, want %q", loaded.VendorNumber, "22222222")
+	}
+}
+
+func TestLoadWithPartialEnvOverrides(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+
+	cfg := &Config{
+		IssuerID:       "file-issuer",
+		KeyID:          "file-key",
+		PrivateKeyPath: "/file/key.p8",
+		VendorNumber:   "11111111",
+	}
+	if err := Save(cfg, path); err != nil {
+		t.Fatalf("Save() error: %v", err)
+	}
+
+	// Only override some values
+	t.Setenv("APPC_ISSUER_ID", "env-issuer")
+
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if loaded.IssuerID != "env-issuer" {
+		t.Errorf("IssuerID = %q, want %q", loaded.IssuerID, "env-issuer")
+	}
+	if loaded.KeyID != "file-key" {
+		t.Errorf("KeyID = %q, want %q", loaded.KeyID, "file-key")
+	}
+}
+
+func TestLoadFromEnvOnly(t *testing.T) {
+	t.Setenv("APPC_ISSUER_ID", "env-issuer")
+	t.Setenv("APPC_KEY_ID", "env-key")
+	t.Setenv("APPC_PRIVATE_KEY_PATH", "/env/key.p8")
+	t.Setenv("APPC_VENDOR_NUMBER", "22222222")
+
+	loaded, err := Load("/nonexistent/config.json")
+	if err != nil {
+		t.Fatalf("Load() should succeed with env vars even without config file: %v", err)
+	}
+
+	if loaded.IssuerID != "env-issuer" {
+		t.Errorf("IssuerID = %q, want %q", loaded.IssuerID, "env-issuer")
+	}
+	if loaded.KeyID != "env-key" {
+		t.Errorf("KeyID = %q, want %q", loaded.KeyID, "env-key")
+	}
+	if loaded.PrivateKeyPath != "/env/key.p8" {
+		t.Errorf("PrivateKeyPath = %q, want %q", loaded.PrivateKeyPath, "/env/key.p8")
+	}
+	if loaded.VendorNumber != "22222222" {
+		t.Errorf("VendorNumber = %q, want %q", loaded.VendorNumber, "22222222")
+	}
+}
+
 func TestSaveFilePermissions(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.json")
