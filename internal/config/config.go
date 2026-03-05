@@ -25,16 +25,42 @@ func DefaultConfigPath() string {
 }
 
 func Load(path string) (*Config, error) {
+	var cfg Config
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("reading config: %w", err)
+		if !hasEnvConfig() {
+			return nil, fmt.Errorf("reading config: %w", err)
+		}
+	} else {
+		if err := json.Unmarshal(data, &cfg); err != nil {
+			return nil, fmt.Errorf("parsing config: %w", err)
+		}
 	}
-	var cfg Config
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing config: %w", err)
-	}
+	applyEnvOverrides(&cfg)
 	cfg.PrivateKeyPath = expandHome(cfg.PrivateKeyPath)
 	return &cfg, nil
+}
+
+func hasEnvConfig() bool {
+	return os.Getenv("APPC_ISSUER_ID") != "" ||
+		os.Getenv("APPC_KEY_ID") != "" ||
+		os.Getenv("APPC_PRIVATE_KEY_PATH") != "" ||
+		os.Getenv("APPC_VENDOR_NUMBER") != ""
+}
+
+func applyEnvOverrides(cfg *Config) {
+	if v := os.Getenv("APPC_ISSUER_ID"); v != "" {
+		cfg.IssuerID = v
+	}
+	if v := os.Getenv("APPC_KEY_ID"); v != "" {
+		cfg.KeyID = v
+	}
+	if v := os.Getenv("APPC_PRIVATE_KEY_PATH"); v != "" {
+		cfg.PrivateKeyPath = v
+	}
+	if v := os.Getenv("APPC_VENDOR_NUMBER"); v != "" {
+		cfg.VendorNumber = v
+	}
 }
 
 func expandHome(path string) string {

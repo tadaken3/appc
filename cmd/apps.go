@@ -9,6 +9,7 @@ import (
 	"github.com/kenta-tanaka/appc/internal/client"
 	"github.com/kenta-tanaka/appc/internal/config"
 	"github.com/kenta-tanaka/appc/internal/output"
+	"github.com/kenta-tanaka/appc/internal/validation"
 	"github.com/spf13/cobra"
 )
 
@@ -27,6 +28,10 @@ func init() {
 }
 
 func runApps(cmd *cobra.Command, args []string) error {
+	if err := validation.CountryCode(appsCountry); err != nil {
+		return err
+	}
+
 	_, c, err := buildClient()
 	if err != nil {
 		return err

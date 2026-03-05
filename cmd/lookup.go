@@ -7,6 +7,7 @@ import (
 
 	"github.com/kenta-tanaka/appc/internal/api"
 	"github.com/kenta-tanaka/appc/internal/output"
+	"github.com/kenta-tanaka/appc/internal/validation"
 	"github.com/spf13/cobra"
 )
 
@@ -30,6 +31,13 @@ func init() {
 }
 
 func runLookup(cmd *cobra.Command, args []string) error {
+	if err := validation.AppIDs(lookupAppIDs); err != nil {
+		return err
+	}
+	if err := validation.CountryCode(lookupCountry); err != nil {
+		return err
+	}
+
 	ids := strings.Split(lookupAppIDs, ",")
 	for i := range ids {
 		ids[i] = strings.TrimSpace(ids[i])

@@ -8,6 +8,7 @@ import (
 	"github.com/kenta-tanaka/appc/internal/api"
 	"github.com/kenta-tanaka/appc/internal/output"
 	"github.com/kenta-tanaka/appc/internal/sales"
+	"github.com/kenta-tanaka/appc/internal/validation"
 	"github.com/spf13/cobra"
 )
 
@@ -40,6 +41,22 @@ func init() {
 }
 
 func runSales(cmd *cobra.Command, args []string) error {
+	if salesFrom != "" {
+		if err := validation.DateString(salesFrom); err != nil {
+			return fmt.Errorf("--from: %w", err)
+		}
+	}
+	if salesTo != "" {
+		if err := validation.DateString(salesTo); err != nil {
+			return fmt.Errorf("--to: %w", err)
+		}
+	}
+	if salesReportDate != "" {
+		if err := validation.DateString(salesReportDate); err != nil {
+			return fmt.Errorf("--date: %w", err)
+		}
+	}
+
 	cfg, c, err := buildClient()
 	if err != nil {
 		return err

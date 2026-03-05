@@ -6,6 +6,7 @@ import (
 
 	"github.com/kenta-tanaka/appc/internal/api"
 	"github.com/kenta-tanaka/appc/internal/output"
+	"github.com/kenta-tanaka/appc/internal/validation"
 	"github.com/spf13/cobra"
 )
 
@@ -45,6 +46,10 @@ func init() {
 }
 
 func runAnalytics(cmd *cobra.Command, args []string) error {
+	if err := validation.AppID(analyticsAppID); err != nil {
+		return err
+	}
+
 	_, c, err := buildClient()
 	if err != nil {
 		return err
