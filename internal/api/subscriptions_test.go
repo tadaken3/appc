@@ -440,3 +440,11 @@ func TestListSubscriptionsInvalidJSON(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 }
+
+func TestFetchAppSubscriptionsEmptyAppID(t *testing.T) {
+	c := client.New(&stubTokenProvider{})
+	_, err := FetchAppSubscriptions(context.Background(), c, SubscriptionParams{AppID: ""})
+	if err == nil {
+		t.Fatal("expected error for empty AppID, got nil")
+	}
+}

@@ -15,9 +15,9 @@ var (
 )
 
 var subscriptionsCmd = &cobra.Command{
-	Use:   "subscriptions",
+	Use:   "subscriptions --app <APP_ID> [--group <GROUP_ID>]",
 	Short: "List subscription groups and plans",
-	Long:  "Retrieve subscription groups and individual subscription plans for a specific app.",
+	Long:  "Retrieve subscription groups and individual subscription plans for a specific app.\nOutputs JSON by default; use --format csv for CSV output.",
 	RunE:  runSubscriptions,
 }
 

@@ -76,7 +76,7 @@ func (s SubscriptionInfo) CSVRow() []string {
 
 // ListSubscriptionGroups fetches subscription groups for an app.
 func ListSubscriptionGroups(ctx context.Context, c *client.Client, appID string) ([]SubscriptionGroup, error) {
-	var groups []SubscriptionGroup
+	groups := make([]SubscriptionGroup, 0)
 	path := fmt.Sprintf("/v1/apps/%s/subscriptionGroups", url.PathEscape(appID))
 
 	for path != "" {
@@ -110,7 +110,7 @@ func ListSubscriptionGroups(ctx context.Context, c *client.Client, appID string)
 
 // ListSubscriptions fetches subscriptions within a subscription group.
 func ListSubscriptions(ctx context.Context, c *client.Client, groupID string) ([]SubscriptionInfo, error) {
-	var subs []SubscriptionInfo
+	subs := make([]SubscriptionInfo, 0)
 	path := fmt.Sprintf("/v1/subscriptionGroups/%s/subscriptions", url.PathEscape(groupID))
 
 	for path != "" {
@@ -149,6 +149,10 @@ func ListSubscriptions(ctx context.Context, c *client.Client, groupID string) ([
 // FetchAppSubscriptions fetches all subscriptions for an app, grouped by subscription group.
 // If params.GroupID is set, only that group's subscriptions are returned.
 func FetchAppSubscriptions(ctx context.Context, c *client.Client, params SubscriptionParams) ([]SubscriptionInfo, error) {
+	if params.AppID == "" {
+		return nil, fmt.Errorf("app id is required")
+	}
+
 	groups, err := ListSubscriptionGroups(ctx, c, params.AppID)
 	if err != nil {
 		return nil, fmt.Errorf("fetching subscription groups: %w", err)
@@ -163,7 +167,7 @@ func FetchAppSubscriptions(ctx context.Context, c *client.Client, params Subscri
 			}
 		}
 		if group == nil {
-			return nil, nil
+			return []SubscriptionInfo{}, nil
 		}
 		subs, err := ListSubscriptions(ctx, c, group.ID)
 		if err != nil {
@@ -176,7 +180,7 @@ func FetchAppSubscriptions(ctx context.Context, c *client.Client, params Subscri
 		return subs, nil
 	}
 
-	var results []SubscriptionInfo
+	results := make([]SubscriptionInfo, 0)
 	for _, g := range groups {
 		subs, err := ListSubscriptions(ctx, c, g.ID)
 		if err != nil {
