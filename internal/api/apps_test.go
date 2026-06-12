@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/kenta-tanaka/appc/internal/client"
+	"github.com/tadaken3/appc/internal/client"
 )
 
 type stubTokenProvider struct{}

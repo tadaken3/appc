@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kenta-tanaka/appc/internal/api"
-	"github.com/kenta-tanaka/appc/internal/output"
+	"github.com/tadaken3/appc/internal/api"
+	"github.com/tadaken3/appc/internal/output"
 	"github.com/spf13/cobra"
 )
 

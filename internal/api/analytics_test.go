@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/kenta-tanaka/appc/internal/client"
+	"github.com/tadaken3/appc/internal/client"
 )
 
 func TestRequestAnalyticsReport(t *testing.T) {

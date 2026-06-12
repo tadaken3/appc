@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/kenta-tanaka/appc/cmd"
+	"github.com/tadaken3/appc/cmd"
 )
 
 func main() {

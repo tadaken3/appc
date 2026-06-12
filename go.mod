@@ -1,4 +1,4 @@
-module github.com/kenta-tanaka/appc
+module github.com/tadaken3/appc
 
 go 1.25.0
 
