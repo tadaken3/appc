@@ -29,10 +29,16 @@ func NewTokenGenerator(issuerID, keyID, keyPath string) (*TokenGenerator, error)
 	if err != nil {
 		return nil, fmt.Errorf("reading private key: %w", err)
 	}
+	return NewTokenGeneratorFromPEM(issuerID, keyID, data)
+}
 
-	block, _ := pem.Decode(data)
+// NewTokenGeneratorFromPEM builds a TokenGenerator from PEM-encoded private key
+// bytes, allowing the key to be supplied from sources other than a file (e.g.
+// an environment variable in a cloud environment).
+func NewTokenGeneratorFromPEM(issuerID, keyID string, pemData []byte) (*TokenGenerator, error) {
+	block, _ := pem.Decode(pemData)
 	if block == nil {
-		return nil, fmt.Errorf("failed to decode PEM block from %s", keyPath)
+		return nil, fmt.Errorf("failed to decode PEM block from private key")
 	}
 
 	parsed, err := x509.ParsePKCS8PrivateKey(block.Bytes)

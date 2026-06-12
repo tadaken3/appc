@@ -131,6 +131,99 @@ func TestValidate(t *testing.T) {
 	})
 }
 
+func TestValidateInlinePrivateKey(t *testing.T) {
+	// Inline private key content should pass validation without a file.
+	cfg := &Config{
+		IssuerID:     "issuer-123",
+		KeyID:        "key-456",
+		PrivateKey:   "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----",
+		VendorNumber: "12345678",
+	}
+	if err := Validate(cfg); err != nil {
+		t.Errorf("Validate() unexpected error with inline key: %v", err)
+	}
+}
+
+func TestResolveFromEnv(t *testing.T) {
+	// No config file: values come entirely from the environment.
+	t.Setenv(EnvIssuerID, "env-issuer")
+	t.Setenv(EnvKeyID, "env-key")
+	t.Setenv(EnvPrivateKey, "env-pem")
+	t.Setenv(EnvVendorNumber, "env-vendor")
+
+	cfg, err := Resolve(filepath.Join(t.TempDir(), "missing.json"))
+	if err != nil {
+		t.Fatalf("Resolve() error: %v", err)
+	}
+	if cfg.IssuerID != "env-issuer" {
+		t.Errorf("IssuerID = %q, want %q", cfg.IssuerID, "env-issuer")
+	}
+	if cfg.KeyID != "env-key" {
+		t.Errorf("KeyID = %q, want %q", cfg.KeyID, "env-key")
+	}
+	if cfg.PrivateKey != "env-pem" {
+		t.Errorf("PrivateKey = %q, want %q", cfg.PrivateKey, "env-pem")
+	}
+	if cfg.VendorNumber != "env-vendor" {
+		t.Errorf("VendorNumber = %q, want %q", cfg.VendorNumber, "env-vendor")
+	}
+}
+
+func TestResolveEnvOverridesFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	if err := Save(&Config{
+		IssuerID:       "file-issuer",
+		KeyID:          "file-key",
+		PrivateKeyPath: "/file/key.p8",
+		VendorNumber:   "file-vendor",
+	}, path); err != nil {
+		t.Fatalf("Save() error: %v", err)
+	}
+
+	t.Setenv(EnvIssuerID, "env-issuer")
+
+	cfg, err := Resolve(path)
+	if err != nil {
+		t.Fatalf("Resolve() error: %v", err)
+	}
+	if cfg.IssuerID != "env-issuer" {
+		t.Errorf("IssuerID = %q, want env to override file", cfg.IssuerID)
+	}
+	if cfg.KeyID != "file-key" {
+		t.Errorf("KeyID = %q, want value from file", cfg.KeyID)
+	}
+}
+
+func TestPrivateKeyPEM(t *testing.T) {
+	t.Run("inline content preferred", func(t *testing.T) {
+		cfg := &Config{PrivateKey: "inline-pem", PrivateKeyPath: "/should/not/read"}
+		data, err := cfg.PrivateKeyPEM()
+		if err != nil {
+			t.Fatalf("PrivateKeyPEM() error: %v", err)
+		}
+		if string(data) != "inline-pem" {
+			t.Errorf("PrivateKeyPEM() = %q, want %q", data, "inline-pem")
+		}
+	})
+
+	t.Run("reads from file path", func(t *testing.T) {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "key.p8")
+		if err := os.WriteFile(path, []byte("file-pem"), 0600); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+		cfg := &Config{PrivateKeyPath: path}
+		data, err := cfg.PrivateKeyPEM()
+		if err != nil {
+			t.Fatalf("PrivateKeyPEM() error: %v", err)
+		}
+		if string(data) != "file-pem" {
+			t.Errorf("PrivateKeyPEM() = %q, want %q", data, "file-pem")
+		}
+	})
+}
+
 func TestSaveFilePermissions(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.json")

@@ -61,12 +61,20 @@ func runApps(cmd *cobra.Command, args []string) error {
 
 func buildClient() (*config.Config, *client.Client, error) {
 	cfgPath := config.DefaultConfigPath()
-	cfg, err := config.Load(cfgPath)
+	cfg, err := config.Resolve(cfgPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("loading config (run 'appc configure' first): %w", err)
 	}
+	if err := config.Validate(cfg); err != nil {
+		return nil, nil, fmt.Errorf("invalid config: %w", err)
+	}
 
-	tokenGen, err := auth.NewTokenGenerator(cfg.IssuerID, cfg.KeyID, cfg.PrivateKeyPath)
+	keyPEM, err := cfg.PrivateKeyPEM()
+	if err != nil {
+		return nil, nil, fmt.Errorf("setting up auth: %w", err)
+	}
+
+	tokenGen, err := auth.NewTokenGeneratorFromPEM(cfg.IssuerID, cfg.KeyID, keyPEM)
 	if err != nil {
 		return nil, nil, fmt.Errorf("setting up auth: %w", err)
 	}

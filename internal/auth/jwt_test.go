@@ -133,3 +133,31 @@ func TestInvalidKeyPath(t *testing.T) {
 		t.Fatal("expected error for invalid key path")
 	}
 }
+
+func TestNewTokenGeneratorFromPEM(t *testing.T) {
+	keyPath := generateTestP8Key(t)
+	pemData, err := os.ReadFile(keyPath)
+	if err != nil {
+		t.Fatalf("reading key: %v", err)
+	}
+
+	gen, err := NewTokenGeneratorFromPEM("issuer-123", "key-456", pemData)
+	if err != nil {
+		t.Fatalf("NewTokenGeneratorFromPEM() error: %v", err)
+	}
+
+	token, err := gen.Token()
+	if err != nil {
+		t.Fatalf("Token() error: %v", err)
+	}
+	if token == "" {
+		t.Fatal("Token() returned empty string")
+	}
+}
+
+func TestNewTokenGeneratorFromPEMInvalid(t *testing.T) {
+	_, err := NewTokenGeneratorFromPEM("issuer", "key", []byte("not a pem"))
+	if err == nil {
+		t.Fatal("expected error for invalid PEM data")
+	}
+}
