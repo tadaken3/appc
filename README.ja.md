@@ -55,6 +55,31 @@ appc configure
 
 設定は `~/.config/appc/config.json` にパーミッション `0600` で保存されます。
 
+### 環境変数（CI・クラウド環境）
+
+`appc configure` の実行や `.p8` ファイルの配置が難しい環境（CI、コンテナ、
+Claude Code on the web など）では、設定を環境変数だけで渡すこともできます。
+環境変数が設定されている場合は設定ファイルの値を**上書き**するため、設定ファイル
+は任意です。
+
+| 環境変数 | 説明 |
+|---|---|
+| `APPC_ISSUER_ID` | Issuer ID |
+| `APPC_KEY_ID` | Key ID |
+| `APPC_PRIVATE_KEY` | `.p8` 秘密鍵の PEM 内容（インライン） |
+| `APPC_PRIVATE_KEY_PATH` | `.p8` ファイルのパス（`APPC_PRIVATE_KEY` の代替） |
+| `APPC_VENDOR_NUMBER` | 売上レポート用のベンダー番号 |
+
+`APPC_PRIVATE_KEY` は `APPC_PRIVATE_KEY_PATH` より優先されます。例:
+
+```bash
+export APPC_ISSUER_ID="..."
+export APPC_KEY_ID="..."
+export APPC_VENDOR_NUMBER="..."
+export APPC_PRIVATE_KEY="$(cat AuthKey_XXXX.p8)"
+appc configure --validate   # 認証情報が正しく解決できるか確認
+```
+
 ## コマンド一覧
 
 ### `appc apps`

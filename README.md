@@ -55,6 +55,31 @@ You will be prompted for:
 
 Configuration is saved to `~/.config/appc/config.json` with `0600` permissions.
 
+### Environment variables (CI / cloud environments)
+
+In environments where running `appc configure` or placing a `.p8` file on disk
+is inconvenient (CI, containers, Claude Code on the web, etc.), the
+configuration can be supplied entirely through environment variables. When set,
+they **override** the values in the config file, so a config file is optional.
+
+| Variable | Description |
+|---|---|
+| `APPC_ISSUER_ID` | Issuer ID |
+| `APPC_KEY_ID` | Key ID |
+| `APPC_PRIVATE_KEY` | PEM content of the `.p8` private key (inline) |
+| `APPC_PRIVATE_KEY_PATH` | Path to the `.p8` file (alternative to `APPC_PRIVATE_KEY`) |
+| `APPC_VENDOR_NUMBER` | Vendor number for sales reports |
+
+`APPC_PRIVATE_KEY` takes precedence over `APPC_PRIVATE_KEY_PATH`. Example:
+
+```bash
+export APPC_ISSUER_ID="..."
+export APPC_KEY_ID="..."
+export APPC_VENDOR_NUMBER="..."
+export APPC_PRIVATE_KEY="$(cat AuthKey_XXXX.p8)"
+appc configure --validate   # verify credentials resolve correctly
+```
+
 ## Commands
 
 ### `appc apps`

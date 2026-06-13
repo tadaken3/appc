@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kenta-tanaka/appc/internal/config"
+	"github.com/tadaken3/appc/internal/config"
 	"github.com/spf13/cobra"
 )
 

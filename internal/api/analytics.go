@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kenta-tanaka/appc/internal/client"
+	"github.com/tadaken3/appc/internal/client"
 )
 
 // Report Request types
